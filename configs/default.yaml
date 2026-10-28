@@ -1,0 +1,54 @@
+# Single config shared by every script, so all steps use the same data split.
+# Override any value from the command line, e.g. --set wemoe.k=64 --set paths.results_dir=/content/drive/...
+
+tasks: [mrpc, rte, cola, sst2, qnli]
+
+data:
+  model_name: bert-base-uncased
+  max_length: 128
+  split_seed: 42
+  fewshot_pool_size: 256   # labelled examples per task reserved for FSFT (never seen by experts)
+  dev_fraction: 0.1        # dev split for model selection, carved from the official train split
+  dev_max: 1000
+  max_train_examples: null # smoke runs only
+  max_eval_examples: null  # smoke runs only
+
+paths:
+  checkpoint_dir: checkpoints
+  results_dir: results
+
+expert:                    # Experiment 1: one recipe for all tasks, best epoch chosen on dev
+  lr: 2.0e-5
+  batch_size: 32
+  eval_batch_size: 64
+  num_epochs: 3
+  warmup_ratio: 0.1
+  weight_decay: 0.01
+  max_grad_norm: 1.0
+  fp16: true
+  seed: 42
+
+baselines:                 # Task Arithmetic lambda grid, selected on dev
+  lambdas: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+  eval_batch_size: 64
+  fp16: true
+
+wemoe:                     # Experiment 2: WEMoE + FSFT router training
+  k: 256                   # labelled examples per task
+  seed: 0
+  init_lambda: null        # null = best Task Arithmetic lambda from results/baselines.json
+  moe_scope: full          # full (paper) | intermediate (DANC ablation)
+  routing: mean            # mean over non-padding tokens (paper) | cls (DANC)
+  router_hidden_layers: 2
+  impl: merged             # merged | decomposed (less memory) | loop (slow reference)
+  lr: 1.0e-4
+  weight_decay: 0.0
+  batch_size: 16
+  eval_batch_size: 64
+  max_steps: 500
+  warmup_ratio: 0.1
+  eval_every: 50
+  max_grad_norm: null
+  backbone_dropout: false
+  fp16: true
+  run_name: null           # default: {moe_scope}-{routing}-k{k}-s{seed}
