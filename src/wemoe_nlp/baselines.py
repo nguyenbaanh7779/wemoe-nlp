@@ -14,7 +14,7 @@ from .data import Collator, DataConfig, load_task, make_loader
 from .experts import check_expert_data_config, load_experts, load_pretrained, load_tokenizer
 from .inference import evaluate_tasks
 from .merging import TaskArithmeticMerger, expert_as_multihead
-from .metrics import mean_score, normalized_scores
+from .metrics import gain_over_majority, majority_metrics, mean_score, normalized_scores
 from .utils import library_versions, save_json
 
 logger = logging.getLogger(__name__)
@@ -72,6 +72,7 @@ def run_baselines(
     sa_model = merger.apply(sa_lambda)
     sa_dev = evaluate_tasks(sa_model, dev_loaders, device, amp=amp)
     sa_val = evaluate_tasks(sa_model, val_loaders, device, amp=amp)
+    majority_val = {t: majority_metrics(t, d["validation"]["labels"]) for t, d in data.items()}
 
     results = {
         "tasks": tasks,
@@ -82,12 +83,18 @@ def run_baselines(
             "validation": single_val,
             "validation_mean_score": mean_score(single_val),
         },
+        "majority": {
+            "validation": majority_val,
+            "validation_mean_score": mean_score(majority_val),
+            "normalized": normalized_scores(majority_val, single_val),
+        },
         "simple_average": {
             "lambda": sa_lambda,
             "dev": sa_dev,
             "validation": sa_val,
             "validation_mean_score": mean_score(sa_val),
             "normalized": normalized_scores(sa_val, single_val),
+            "gain_over_majority": gain_over_majority(sa_val, single_val, majority_val),
         },
         "task_arithmetic": {
             "lambda_grid": grid,
@@ -95,6 +102,7 @@ def run_baselines(
             "validation": ta_val,
             "validation_mean_score": mean_score(ta_val),
             "normalized": normalized_scores(ta_val, single_val),
+            "gain_over_majority": gain_over_majority(ta_val, single_val, majority_val),
         },
         "versions": library_versions(),
     }

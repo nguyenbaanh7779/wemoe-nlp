@@ -45,3 +45,30 @@ def normalized_scores(
     if out:
         out["mean"] = float(np.mean(list(out.values())))
     return out
+
+
+def majority_metrics(task: str, labels) -> dict:
+    """Metrics of always predicting the most frequent label: the floor a collapsed model falls to."""
+    labels = np.asarray(labels)
+    return compute_metrics(task, np.full_like(labels, np.bincount(labels).argmax()), labels)
+
+
+def gain_over_majority(
+    merged: Mapping[str, Mapping[str, float]],
+    single: Mapping[str, Mapping[str, float]],
+    majority: Mapping[str, Mapping[str, float]],
+) -> dict:
+    """(score - majority) / (expert - majority): 0 = no better than a constant guess, 1 = the expert.
+
+    Unlike ``normalized_scores`` it does not credit a model for the chance level of easy-to-guess
+    tasks (a constant prediction already gets 0.75 on MRPC and ~0.5 on the accuracy tasks).
+    """
+    out = {}
+    for task in merged:
+        if task in single and task in majority:
+            floor = majority[task]["score"]
+            if single[task]["score"] > floor:
+                out[task] = (merged[task]["score"] - floor) / (single[task]["score"] - floor)
+    if out:
+        out["mean"] = float(np.mean(list(out.values())))
+    return out

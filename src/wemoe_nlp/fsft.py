@@ -52,7 +52,10 @@ class FSFTConfig:
     run_name: Optional[str] = None
 
     def resolve_run_name(self) -> str:
-        return self.run_name or f"{self.moe_scope}-{self.routing}-k{self.k}-s{self.seed}"
+        if self.run_name:
+            return self.run_name
+        layers = "" if self.router_hidden_layers == 2 else f"-h{self.router_hidden_layers}"
+        return f"{self.moe_scope}-{self.routing}{layers}-k{self.k}-s{self.seed}"
 
 
 def run_dirs(checkpoint_dir, results_dir, run_name: str):

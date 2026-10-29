@@ -2,6 +2,7 @@ import pytest
 import torch
 import torch.nn.functional as F
 
+from wemoe_nlp.fsft import FSFTConfig
 from wemoe_nlp.merging import build_task_arithmetic_model
 from wemoe_nlp.utils import stored_numel, trainable_numel
 from wemoe_nlp.wemoe import (WEMoEConfig, WeightEnsembledLinear, build_wemoe, expected_stored_numel,
@@ -142,3 +143,8 @@ def test_router_state_roundtrip(tiny_models, tiny_batch):
         torch.testing.assert_close(fresh(**tiny_batch, task="mrpc"), trained(**tiny_batch, task="mrpc"))
     with pytest.raises(KeyError):
         fresh.load_router_state_dict({})
+
+
+def test_run_name_marks_non_default_router_depth():
+    assert FSFTConfig(k=256, seed=0).resolve_run_name() == "full-mean-k256-s0"
+    assert FSFTConfig(k=256, seed=0, router_hidden_layers=0).resolve_run_name() == "full-mean-h0-k256-s0"

@@ -231,3 +231,7 @@ checkpoints/
 logs/
 runs/
 results/**/*.jsonl
+
+# Drive downloads of the Colab outputs (several GB)
+*.zip
+.DS_Store

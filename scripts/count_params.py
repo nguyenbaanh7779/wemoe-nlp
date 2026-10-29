@@ -8,16 +8,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from wemoe_nlp.cli import base_parser, load_run_context  # noqa: E402
-from wemoe_nlp.efficiency import efficiency_report  # noqa: E402
+from wemoe_nlp.efficiency import efficiency_markdown, efficiency_report  # noqa: E402
 from wemoe_nlp.experts import load_experts, load_pretrained  # noqa: E402
 from wemoe_nlp.utils import save_json  # noqa: E402
-
-ROWS = [
-    ("single_task_models", "5 single-task models"),
-    ("task_arithmetic", "Task Arithmetic"),
-    ("wemoe_full", "WEMoE (full MLP)"),
-    ("wemoe_intermediate", "WEMoE (intermediate only)"),
-]
 
 
 def main() -> None:
@@ -38,13 +31,7 @@ def main() -> None:
     out = Path(ctx.results_dir) / "efficiency.json"
     save_json(report, out)
 
-    header = "| Deployment | # checkpoints | Stored params | Size (fp32) | vs 5 models |"
-    lines = [header, "|---|---:|---:|---:|---:|"]
-    for key, label in ROWS:
-        row = report[key]
-        lines.append(f"| {label} | {row['num_checkpoints']} | {row['stored_params'] / 1e6:.1f}M | "
-                     f"{row['stored_bytes'] / 2**30:.2f} GiB | {100 * row['fraction_of_single_task_models']:.1f}% |")
-    print("\n".join(lines))
+    print("\n".join(efficiency_markdown(report)))
     print(f"\nSaved {out}")
 
 

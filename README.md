@@ -32,14 +32,16 @@ The paper has no GLUE results, so it is only compared qualitatively.
 ```
 configs/         default.yaml (all experiments, one shared data split), smoke.yaml (tiny end-to-end check)
 src/wemoe_nlp/   data, metrics, merging, wemoe, experts, baselines, fsft, efficiency, inference
-scripts/         train_expert, eval_baselines, train_wemoe, count_params, summarize_results
+scripts/         train_expert, eval_baselines, train_wemoe, count_params, summarize_results, plot_results
 notebooks/       colab_run.ipynb: the whole pipeline on a Colab GPU, results saved to Google Drive
 tests/           CPU unit tests on tiny random BERTs (offline, a few seconds)
+docs/guide/      setup, running on Colab, getting results back
+docs/report/     results of the first full run, with figures
 ```
 
 ## Running
 
-On Colab, open `notebooks/colab_run.ipynb`.
+On Colab, open `notebooks/colab_run.ipynb`. [docs/guide](docs/guide/README.md) explains the setup step by step, how to get results back and common errors.
 
 Locally (a GPU is needed for the real runs):
 

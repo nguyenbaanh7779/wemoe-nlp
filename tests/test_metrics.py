@@ -1,6 +1,6 @@
 import pytest
 
-from wemoe_nlp.metrics import compute_metrics, mean_score, normalized_scores
+from wemoe_nlp.metrics import compute_metrics, gain_over_majority, majority_metrics, mean_score, normalized_scores
 
 
 def test_mrpc_reports_accuracy_f1_and_their_mean():
@@ -36,3 +36,20 @@ def test_mean_and_normalized_scores():
     normalized = normalized_scores(merged, single)
     assert normalized["rte"] == pytest.approx(0.5) and normalized["sst2"] == pytest.approx(1.0)
     assert normalized["mean"] == pytest.approx(0.75)
+
+
+def test_majority_class_on_mrpc_and_cola():
+    mrpc = majority_metrics("mrpc", [1] * 279 + [0] * 129)
+    assert round(mrpc["accuracy"], 4) == 0.6838 and round(mrpc["f1"], 4) == 0.8122
+    assert majority_metrics("cola", [1, 1, 0])["score"] == 0.0
+
+
+def test_gain_over_majority_is_zero_at_the_constant_guess_and_one_at_the_expert():
+    single = {"rte": {"score": 0.7}, "sst2": {"score": 0.9}}
+    majority = {"rte": {"score": 0.5}, "sst2": {"score": 0.5}}
+    merged = {"rte": {"score": 0.5}, "sst2": {"score": 0.9}}
+    gain = gain_over_majority(merged, single, majority)
+    assert gain["rte"] == pytest.approx(0.0) and gain["sst2"] == pytest.approx(1.0)
+    assert gain["mean"] == pytest.approx(0.5)
+    # an expert no better than the constant guess has no gain to recover: the task is skipped
+    assert gain_over_majority(merged, majority, majority) == {}

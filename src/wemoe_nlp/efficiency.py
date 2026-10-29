@@ -105,3 +105,33 @@ def efficiency_report(pretrained, tasks: Sequence[str], experts: Optional[Mappin
     for key in ("single_task_models", "task_arithmetic", "wemoe_full", "wemoe_intermediate"):
         report[key]["fraction_of_single_task_models"] = round(report[key]["stored_params"] / reference, 4)
     return report
+
+
+REPORT_ROWS = (
+    ("single_task_models", "5 single-task models"),
+    ("task_arithmetic", "Task Arithmetic"),
+    ("wemoe_full", "WEMoE (full MLP)"),
+    ("wemoe_intermediate", "WEMoE (intermediate only)"),
+)
+
+
+def efficiency_markdown(report: dict) -> list:
+    """Storage table, plus a latency table when the report has latency measurements."""
+    lines = ["| Deployment | # checkpoints | Stored params | Size (fp32) | vs 5 models |", "|---|---:|---:|---:|---:|"]
+    for key, label in REPORT_ROWS:
+        row = report[key]
+        lines.append(f"| {label} | {row['num_checkpoints']} | {row['stored_params'] / 1e6:.1f}M | "
+                     f"{row['stored_bytes'] / 2**30:.2f} GiB | {100 * row['fraction_of_single_task_models']:.1f}% |")
+    latency_rows = [(label, report[key]["latency"]) for key, label in REPORT_ROWS if "latency" in report[key]]
+    if latency_rows:
+        batches = list(latency_rows[0][1])
+        header = "| Deployment | " + " | ".join(f"{b.replace('_', ' ')}: ms/example (peak MB)" for b in batches) + " |"
+        lines += ["", header, "|---|" + "---:|" * len(batches)]
+        for label, latency in latency_rows:
+            cells = []
+            for b in batches:
+                row = latency[b]
+                peak = f" ({row['peak_memory_mb']:.0f})" if "peak_memory_mb" in row else ""
+                cells.append(f"{row['ms_per_example']:.2f}{peak}")
+            lines.append(f"| {label} | " + " | ".join(cells) + " |")
+    return lines
