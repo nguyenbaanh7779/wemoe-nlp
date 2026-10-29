@@ -1,0 +1,53 @@
+# Tiny end-to-end run to check the pipeline (minutes, not hours). Numbers are meaningless.
+
+tasks: [mrpc, rte, cola, sst2, qnli]
+
+data:
+  model_name: bert-base-uncased
+  max_length: 64
+  split_seed: 42
+  fewshot_pool_size: 32
+  dev_fraction: 0.1
+  dev_max: 1000
+  max_train_examples: 64
+  max_eval_examples: 32
+
+paths:
+  checkpoint_dir: checkpoints/smoke
+  results_dir: results/smoke
+
+expert:
+  lr: 2.0e-5
+  batch_size: 16
+  eval_batch_size: 32
+  num_epochs: 1
+  warmup_ratio: 0.1
+  weight_decay: 0.01
+  max_grad_norm: 1.0
+  fp16: true
+  seed: 42
+
+baselines:
+  lambdas: [0.3, 1.0]
+  eval_batch_size: 32
+  fp16: true
+
+wemoe:
+  k: 16
+  seed: 0
+  init_lambda: null
+  moe_scope: full
+  routing: mean
+  router_hidden_layers: 2
+  impl: merged
+  lr: 1.0e-4
+  weight_decay: 0.0
+  batch_size: 8
+  eval_batch_size: 32
+  max_steps: 4
+  warmup_ratio: 0.1
+  eval_every: 2
+  max_grad_norm: null
+  backbone_dropout: false
+  fp16: true
+  run_name: null

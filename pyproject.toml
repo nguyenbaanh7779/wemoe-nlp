@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wemoe-nlp"
+version = "0.1.0"
+description = "Reproduction of Weight-Ensembling Mixture of Experts (WEMoE) for multi-task NLP on GLUE"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+# Runtime dependencies live in requirements.txt so that Colab's preinstalled torch is reused.
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

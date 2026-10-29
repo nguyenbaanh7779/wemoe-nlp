@@ -1,0 +1,11 @@
+# Loose bounds for now; pin exact versions after the first full Colab run.
+# torch is preinstalled on Colab; this line only matters for local installs.
+torch>=2.1
+transformers>=4.40
+datasets>=2.18
+scikit-learn>=1.3
+numpy>=1.24
+pyyaml>=6.0
+tqdm>=4.66
+pytest>=7.4
+matplotlib>=3.7

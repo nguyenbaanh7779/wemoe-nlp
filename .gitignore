@@ -218,3 +218,20 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- wemoe-nlp project ---
+# Legacy DANC code and Colab notebooks (kept locally, never committed)
+DANC/
+source_code_DANC-*/
+
+# Model checkpoints and large run artifacts
+checkpoints/
+*.pt
+*.safetensors
+logs/
+runs/
+results/**/*.jsonl
+
+# Drive downloads of the Colab outputs (several GB)
+*.zip
+.DS_Store

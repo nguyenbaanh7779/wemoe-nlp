@@ -1,0 +1,266 @@
+{
+  "run_name": "full-mean-k16-s2",
+  "tasks": [
+    "mrpc",
+    "rte",
+    "cola",
+    "sst2",
+    "qnli"
+  ],
+  "data_config": {
+    "model_name": "bert-base-uncased",
+    "max_length": 128,
+    "split_seed": 42,
+    "fewshot_pool_size": 256,
+    "dev_fraction": 0.1,
+    "dev_max": 1000,
+    "max_train_examples": null,
+    "max_eval_examples": null
+  },
+  "fsft_config": {
+    "k": 16,
+    "seed": 2,
+    "init_lambda": null,
+    "moe_scope": "full",
+    "routing": "mean",
+    "router_hidden_layers": 2,
+    "impl": "merged",
+    "lr": 0.0001,
+    "weight_decay": 0.0,
+    "batch_size": 16,
+    "eval_batch_size": 64,
+    "max_steps": 500,
+    "warmup_ratio": 0.1,
+    "eval_every": 50,
+    "max_grad_norm": null,
+    "backbone_dropout": false,
+    "fp16": true,
+    "run_name": null
+  },
+  "wemoe_config": {
+    "tasks": [
+      "mrpc",
+      "rte",
+      "cola",
+      "sst2",
+      "qnli"
+    ],
+    "init_lambda": 0.3,
+    "moe_scope": "full",
+    "routing": "mean",
+    "router_hidden_layers": 2,
+    "impl": "merged"
+  },
+  "init_lambda": 0.3,
+  "fewshot_idx": {
+    "mrpc": [
+      1053,
+      1519,
+      2954,
+      2095,
+      1788,
+      985,
+      3573,
+      2059,
+      1793,
+      1697,
+      405,
+      2383,
+      120,
+      3619,
+      1512,
+      2064
+    ],
+    "rte": [
+      1413,
+      52,
+      2110,
+      1122,
+      709,
+      116,
+      1038,
+      1206,
+      242,
+      368,
+      1446,
+      75,
+      411,
+      295,
+      2063,
+      260
+    ],
+    "cola": [
+      4325,
+      1461,
+      6593,
+      7900,
+      788,
+      521,
+      3091,
+      3801,
+      2687,
+      603,
+      1750,
+      5992,
+      7704,
+      4895,
+      8056,
+      3057
+    ],
+    "sst2": [
+      15354,
+      46446,
+      5026,
+      128,
+      42748,
+      25397,
+      37849,
+      67199,
+      3554,
+      10777,
+      29559,
+      2360,
+      65950,
+      66969,
+      18647,
+      19131
+    ],
+    "qnli": [
+      14870,
+      13893,
+      96853,
+      25170,
+      39545,
+      81950,
+      59144,
+      46264,
+      1145,
+      2204,
+      12461,
+      34011,
+      27487,
+      55755,
+      11597,
+      80881
+    ]
+  },
+  "best_step": 150,
+  "dev": {
+    "mrpc": {
+      "accuracy": 0.6975476839237057,
+      "f1": 0.8028419182948491,
+      "score": 0.7501948011092774,
+      "n": 367
+    },
+    "rte": {
+      "accuracy": 0.5461847389558233,
+      "score": 0.5461847389558233,
+      "n": 249
+    },
+    "cola": {
+      "accuracy": 0.7812865497076024,
+      "mcc": 0.4914470899939673,
+      "score": 0.4914470899939673,
+      "n": 855
+    },
+    "sst2": {
+      "accuracy": 0.924,
+      "score": 0.924,
+      "n": 1000
+    },
+    "qnli": {
+      "accuracy": 0.638,
+      "score": 0.638,
+      "n": 1000
+    }
+  },
+  "dev_mean_score": 0.6699653260118136,
+  "init_validation": {
+    "mrpc": {
+      "accuracy": 0.6838235294117647,
+      "f1": 0.8122270742358079,
+      "score": 0.7480253018237863,
+      "n": 408
+    },
+    "rte": {
+      "accuracy": 0.4693140794223827,
+      "score": 0.4693140794223827,
+      "n": 277
+    },
+    "cola": {
+      "accuracy": 0.7056567593480345,
+      "mcc": 0.19649848361278144,
+      "score": 0.19649848361278144,
+      "n": 1043
+    },
+    "sst2": {
+      "accuracy": 0.7052752293577982,
+      "score": 0.7052752293577982,
+      "n": 872
+    },
+    "qnli": {
+      "accuracy": 0.779974373055098,
+      "score": 0.779974373055098,
+      "n": 5463
+    }
+  },
+  "init_validation_mean_score": 0.5798174934543694,
+  "validation": {
+    "mrpc": {
+      "accuracy": 0.6642156862745098,
+      "f1": 0.7814992025518341,
+      "score": 0.7228574444131719,
+      "n": 408
+    },
+    "rte": {
+      "accuracy": 0.49097472924187724,
+      "score": 0.49097472924187724,
+      "n": 277
+    },
+    "cola": {
+      "accuracy": 0.7564717162032598,
+      "mcc": 0.4374589971987833,
+      "score": 0.4374589971987833,
+      "n": 1043
+    },
+    "sst2": {
+      "accuracy": 0.8727064220183486,
+      "score": 0.8727064220183486,
+      "n": 872
+    },
+    "qnli": {
+      "accuracy": 0.6648361706022332,
+      "score": 0.6648361706022332,
+      "n": 5463
+    }
+  },
+  "validation_mean_score": 0.6377667526948828,
+  "normalized": {
+    "mrpc": 0.849425210677216,
+    "rte": 0.7771428571428571,
+    "cola": 0.740709414520599,
+    "sst2": 0.9465174129353233,
+    "qnli": 0.7288781858318283,
+    "mean": 0.8085346162215646
+  },
+  "parameters": {
+    "stored": 399969094,
+    "trainable": 7133244,
+    "breakdown": {
+      "shared_backbone": 52813056,
+      "base_mlp": 56669184,
+      "task_vectors": 283345920,
+      "routers": 7133244,
+      "heads": 7690,
+      "total": 399969094
+    }
+  },
+  "train_seconds": 964.3,
+  "router_checkpoint": "/content/drive/MyDrive/wemoe-nlp/checkpoints/wemoe/full-mean-k16-s2/router.pt",
+  "versions": {
+    "torch": "2.11.0+cu130",
+    "transformers": "5.20.2",
+    "datasets": "4.8.5",
+    "scikit-learn": "1.6.1"
+  }
+}
