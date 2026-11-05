@@ -1,0 +1,86 @@
+{
+  "task": "mrpc",
+  "data_config": {
+    "model_name": "bert-base-uncased",
+    "max_length": 128,
+    "split_seed": 42,
+    "fewshot_pool_size": 256,
+    "dev_fraction": 0.1,
+    "dev_max": 1000,
+    "max_train_examples": null,
+    "max_eval_examples": null
+  },
+  "train_config": {
+    "lr": 2e-05,
+    "batch_size": 32,
+    "eval_batch_size": 64,
+    "num_epochs": 3,
+    "warmup_ratio": 0.1,
+    "weight_decay": 0.01,
+    "max_grad_norm": 1.0,
+    "fp16": true,
+    "seed": 42
+  },
+  "split_sizes": {
+    "expert_train": 3045,
+    "dev": 367,
+    "validation": 408
+  },
+  "label_names": [
+    "not_equivalent",
+    "equivalent"
+  ],
+  "best_epoch": 2,
+  "dev": {
+    "accuracy": 0.8065395095367848,
+    "f1": 0.8692449355432781,
+    "score": 0.8378922225400314,
+    "n": 367
+  },
+  "validation": {
+    "accuracy": 0.821078431372549,
+    "f1": 0.8809135399673735,
+    "score": 0.8509959856699613,
+    "n": 408
+  },
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.5811560607204834,
+      "dev": {
+        "accuracy": 0.7220708446866485,
+        "f1": 0.7792207792207793,
+        "score": 0.7506458119537138,
+        "n": 367
+      }
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.40374678187072277,
+      "dev": {
+        "accuracy": 0.8065395095367848,
+        "f1": 0.8692449355432781,
+        "score": 0.8378922225400314,
+        "n": 367
+      }
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.2532648757720987,
+      "dev": {
+        "accuracy": 0.7956403269754768,
+        "f1": 0.8603351955307262,
+        "score": 0.8279877612531015,
+        "n": 367
+      }
+    }
+  ],
+  "train_seconds": 48.3,
+  "checkpoint": "/content/drive/MyDrive/wemoe-nlp/checkpoints/experts/mrpc",
+  "versions": {
+    "torch": "2.11.0+cu130",
+    "transformers": "5.20.2",
+    "datasets": "4.8.5",
+    "scikit-learn": "1.6.1"
+  }
+}

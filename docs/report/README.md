@@ -1,10 +1,10 @@
 ---
 title: "Merging BERT Experts with Weight-Ensembling MoE"
 subtitle: "Results of the first full run: WEMoE + few-shot router training on five GLUE tasks"
-date: "Run v1 · 28 October 2026 · commit 35f8552"
+date: "Training run v1 (28 October 2026, commit 35f8552) · runs v2 and v3 (4–5 November 2026, commit 891d681)"
 ---
 
-This report presents the results of the first complete run of the pipeline (`notebooks/colab_run_executed_v1.ipynb`). The raw numbers are in `results/` and the full table is in [`results/summary.md`](../../results/summary.md). How to rerun everything is described in the [setup guide](../guide/README.md).
+This report presents the results of the first complete run of the pipeline. The models were trained in run v1 (`notebooks/colab_run_executed_v1.ipynb`). Run v2 (`notebooks/colab_run_executed_v2.ipynb`) reused them, re-evaluated the baselines with the majority class and measured latency. The router ablation (§6) was trained on 4 November in a separate Colab session whose output was not kept. Run v3 (`notebooks/colab_run_executed_v3.ipynb`) skipped those finished runs, measured latency again and wrote the final summary. The raw numbers are in `results/` and the full table is in [`results/summary.md`](../../results/summary.md). How to rerun everything is described in the [setup guide](../guide/README.md).
 
 # 1. Summary
 
@@ -19,7 +19,10 @@ This report presents the results of the first complete run of the pipeline (`not
    - Upscaling only `intermediate.dense` gives RTE a large weight and reaches 59.0.
    - Both MoE scopes end up at almost the same average.
 4. **The few-shot budget matters.** k = 16 and k = 64 are unstable across seeds (CoLA MCC std 14–18). k = 256 is stable.
-5. **Routing is partly input-dependent.** Inputs from different tasks share most of their routing pattern: the mean routing matrices have an average correlation of 0.82. Even so, about 58% of the routing variance comes from the task of the input. A layer-wise, input-independent ablation is prepared (§6) to measure how much this matters.
+5. **WEMoE costs storage and latency.** Full-MLP WEMoE stores 73% of the parameters of five separate models and is 4.5× slower than one BERT in batches of 32 (intermediate only: 47% and 3×).
+6. **The gain comes from input-dependent routing.**
+   - Inputs from different tasks share most of their routing pattern: the mean routing matrices have an average correlation of 0.82. Even so, about 58% of the routing variance comes from the task of the input.
+   - The ablation settles the question. When each layer learns one fixed coefficient per expert, the same for every input, FSFT barely moves the model: average 58.4 and gain 20.0, against 57.4 / 18.4 for Task Arithmetic and 69.9 / 59.1 for WEMoE.
 
 # 2. Setup
 
@@ -62,41 +65,44 @@ Official GLUE validation splits, scores ×100. WEMoE rows are mean ± std over s
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | Single-task experts | 82.1/88.1 | 63.2 | 59.1 | 92.2 | 91.2 | 78.2 | 100.0 | 100.0 |
 | Majority class | 68.4/81.2 | 52.7 | 0.0 | 50.9 | 50.5 | 45.8 | 56.4 | 0.0 |
-| Simple Averaging (λ = 1/5) | 68.4/81.2 | 46.9 | 23.3 | 55.4 | 65.9 | 53.3 | 66.8 | 6.5 |
-| Task Arithmetic (λ = 0.3) | 68.6/81.3 | 47.3 | 16.9 | 69.8 | 77.9 | 57.4 | 70.6 | 18.3 |
-| WEMoE init (full MLP) | 68.5±0.1/81.3±0.1 | 47.1±0.2 | 19.3±2.0 | 70.2±1.1 | 77.7±0.2 | 57.8±0.6 | 71.3±1.0 | 18.7 |
-| **WEMoE + FSFT (full MLP, k = 256)** | 76.3±4.5/83.9±2.8 | 52.0±4.4 | 42.6±0.9 | 88.0±0.5 | 86.7±0.7 | **69.9±0.1** | **87.8±0.5** | **59.1** |
-| WEMoE + FSFT (intermediate, k = 256) | 66.5±0.7/76.6±1.0 | 59.0±0.9 | 41.7±0.9 | 86.7±0.2 | 86.5±0.2 | 69.1±0.1 | 87.4±0.1 | 54.8 |
+| Simple Averaging (λ = 1/5) | 68.4/81.2 | 46.9 | 23.3 | 55.4 | 65.9 | 53.3 | 66.8 | 6.6 |
+| Task Arithmetic (λ = 0.3) | 68.6/81.3 | 47.3 | 16.9 | 69.8 | 77.9 | 57.4 | 70.6 | 18.4 |
+| WEMoE init (full MLP) | 68.5±0.1/81.3±0.1 | 47.1±0.2 | 19.3±2.0 | 70.2±1.1 | 77.7±0.2 | 57.8±0.6 | 71.3±1.0 | 18.7±1.5 |
+| **WEMoE + FSFT (full MLP, k = 256)** | 76.3±4.5/83.9±2.8 | 52.0±4.4 | 42.6±0.9 | 88.0±0.5 | 86.7±0.7 | **69.9±0.1** | **87.8±0.5** | **59.1±1.1** |
+| WEMoE + FSFT (intermediate, k = 256) | 66.5±0.7/76.6±1.0 | 59.0±0.9 | 41.7±0.9 | 86.7±0.2 | 86.5±0.2 | 69.1±0.1 | 87.4±0.1 | 54.8±1.7 |
+| Layer-wise coefficients + FSFT (h = 0, k = 256; §6) | 68.4±0.0/81.2±0.0 | 47.3±0.0 | 20.2±0.0 | 70.9±0.1 | 78.6±0.0 | 58.4±0.0 | 72.0±0.0 | 20.0±0.0 |
 
 **Normalized** is the task score divided by the expert's score, averaged over tasks. **Gain over majority** is (score − majority) / (expert − majority), averaged over tasks: 0 is a constant guess and 100 is the expert. The second measure is the honest one for these tasks, because a constant guess already scores 75 on MRPC and about 50 on the accuracy tasks.
 
-*Figure pending: run `python scripts/plot_results.py` once all result files are downloaded (only part of the seeds is available locally).*
+![Per-task validation scores](figures/per_task.png)
 
 How to read the figure:
 - The black ticks are the experts and the dashed ticks are the majority class.
 - Task Arithmetic sits on the majority tick for MRPC and below it for RTE.
 - WEMoE + FSFT clears the majority on every task except RTE (full MLP) and MRPC (intermediate).
+- The layer-wise model (yellow) stays at the Task Arithmetic level on every task.
 
-Gain over majority per task (×100, from the seed means):
+Gain over majority per task (×100, mean over seeds):
 
 | Model | MRPC | RTE | CoLA | SST-2 | QNLI |
 |---|---:|---:|---:|---:|---:|
-| Task Arithmetic | 1 | −52 | 29 | 46 | 67 |
+| Task Arithmetic | 2 | −52 | 29 | 46 | 67 |
 | WEMoE + FSFT, full MLP, k = 256 | 51 | −7 | 72 | 90 | 89 |
-| WEMoE + FSFT, intermediate, k = 256 | −32 | 60 | 71 | 87 | 88 |
+| WEMoE + FSFT, intermediate, k = 256 | −32 | 60 | 71 | 87 | 89 |
+| Layer-wise coefficients + FSFT, k = 256 | 0 | −52 | 34 | 49 | 69 |
 
 # 4. Few-shot budget
 
-*Figure pending: run `python scripts/plot_results.py` once all result files are downloaded (only part of the seeds is available locally).*
+![Average score against k](figures/k_sweep.png)
 
 | k (examples per task) | Avg | Normalized | Gain over majority | Best step (of 500) |
 |---:|---:|---:|---:|---|
-| 16 | 60.8±2.7 | 75.6±4.6 | 25.5 | 50, 150 (seeds 0, 2) |
-| 64 | 64.6±3.7 | 79.5±6.3 | 46.7 | 100, 250, 100 |
-| 256 | 69.9±0.1 | 87.8±0.5 | 59.1 | 250 (seed 0) |
+| 16 | 60.8±2.7 | 75.6±4.6 | 25.5±4.6 | 50, 0, 150 |
+| 64 | 64.6±3.7 | 79.5±6.3 | 46.7±8.5 | 100, 250, 100 |
+| 256 | 69.9±0.1 | 87.8±0.5 | 59.1±1.1 | 250, 200, 200 |
 
 - **Small k overfits early and varies a lot between seeds.**
-  - With k = 16, the best step comes at 50–150, and CoLA MCC ranges from 18 to 44 across seeds.
+  - With k = 16, the best step comes at 0–150, and CoLA MCC ranges from 18 to 44 across seeds. For seed 1 no step beat the untrained router on dev (best step 0), so that run reports WEMoE init.
   - With k = 64, CoLA ranges from 9 to 41.
   - At k = 256, every task has a std of 0.9 or less, except MRPC and RTE, which are small and close to their majority class.
 - **Gain grows faster than the average score.** From k = 16 to k = 64 the average moves 3.8 points but the gain over majority almost doubles. Part of the k = 16 average is MRPC and RTE sitting at their constant-guess level.
@@ -110,7 +116,7 @@ Gain over majority per task (×100, from the seed means):
 | Avg / gain over majority | 69.9 / 59.1 | 69.1 / 54.8 |
 | RTE / MRPC acc | 52.0 / 76.3 | 59.0 / 66.5 |
 | FSFT time per run (T4) | about 16 min | about 8.5 min |
-| Best step (of 500) | 250 (seed 0) | 500, 400, 400 |
+| Best step (of 500) | 250, 200, 200 | 500, 400, 400 |
 
 - The two scopes reach almost the same average. The intermediate-only model is 35% smaller and trains twice as fast.
 - The difference is in which tasks win. Full MLP solves MRPC but not RTE; intermediate-only does the opposite.
@@ -144,14 +150,31 @@ The figure averages the routing weights of seed 0 (full MLP, k = 256) over the v
    The RTE task vector is subtracted in layers 11–12 for every input type, including RTE (−1.2). This matches RTE staying below the majority class.
 4. **Intermediate-only routing does use the RTE expert.** On RTE inputs it gives the RTE expert 0.96 on average and 2.04 in layer 12. This is the scope where RTE reaches 59.0.
 
-## Pending: input-independent ablation
+## 6.1 Ablation: input-independent routing
 
-Finding 2 raises a question: how much of the gain comes from *input-dependent* routing, and how much from simply learning better per-layer merge coefficients? To answer it, the notebook now runs `router_hidden_layers=0`:
-- each layer has one learned coefficient per expert, the same for every input;
-- it uses the same FSFT data, with lr 1e-3, since only 60 numbers are trained;
-- the runs are named `full-mean-h0-k256-s{0,1,2}`.
+An ablation removes one component of a method and keeps everything else fixed, to test whether that component is needed. Section 5 is one such ablation (upscaling `output.dense` turned out not to be needed).
 
-Its results will be added here.
+Finding 2 raises a question: how much of the gain comes from *input-dependent* routing, and how much from simply learning better per-layer merge coefficients? The ablation sets `router_hidden_layers=0`:
+- each layer has one learned coefficient per expert, the same for every input (60 numbers in total);
+- the coefficients start at λ = 0.3, so at step 0 the model is exactly Task Arithmetic;
+- it uses the same FSFT data and schedule, with lr 1e-3 instead of 1e-4, since there are so few parameters;
+- the runs are `full-mean-h0-k256-s{0,1,2}`.
+
+| k = 256, full MLP | Avg | Gain over majority | Best step (of 500) |
+|---|---:|---:|---|
+| Task Arithmetic (λ = 0.3) | 57.4 | 18.4 | – |
+| Layer-wise coefficients + FSFT | 58.4±0.0 | 20.0±0.0 | 50, 50, 50 |
+| WEMoE + FSFT (input-dependent routers) | 69.9±0.1 | 59.1±1.1 | 250, 200, 200 |
+
+**The layer-wise model learns almost nothing.**
+- Its dev score stays flat for all 500 steps: between 62.4 and 63.0, against 62.8 at step 0. The training loss falls from 3.5 to about 2.8, but this does not carry over to dev.
+- The best step is 50 for every seed. At that step the coefficients have moved at most 0.02 away from 0.3, so the reported model is Task Arithmetic with slightly re-weighted experts: the SST-2 expert a little up, the RTE and CoLA experts a little down.
+- Validation improves by 1 point on average (CoLA +3.3, SST-2 +1.1). MRPC and RTE stay at their constant prediction.
+- The three seeds agree to 0.1 point. With no random initial weights, the seed only changes the few-shot sample, and the model barely moves from its start.
+
+By contrast, the input-dependent routers raise dev from 62.6 to 72.6 in the same 500 steps (seed 0). **Almost all of the 41-point gain of WEMoE over Task Arithmetic therefore comes from routing on the input**, not from learning better per-layer merge coefficients. A static merge cannot be tuned to the level of WEMoE with this data.
+
+Caveat: only one learning rate (1e-3) was tried for the layer-wise model. Since dev did not improve at any of the 10 evaluation points, a larger learning rate is unlikely to change the conclusion, but it was not tested.
 
 # 7. Efficiency and cost
 
@@ -171,13 +194,31 @@ Its results will be added here.
 
 | Step | Time |
 |---|---|
-| Five experts | about 45 min in total (RTE 0.7 min, QNLI about 30 min) |
+| Five experts | 43 min in total: MRPC 0.8, RTE 0.7, CoLA 1.1, SST-2 11.0, QNLI 29.8 min |
 | Baselines (single-task, SA, 10 TA λ values) | about 2 min |
-| WEMoE + FSFT, full MLP | 14–16 min per run, the same for every k (500 steps) |
+| WEMoE + FSFT, full MLP | 14–16.5 min per run, the same for every k (500 steps) |
 | WEMoE + FSFT, intermediate | about 8.5 min per run |
-| All 12 FSFT runs | about 2.8 h |
+| Layer-wise ablation (h = 0) | about 15.4 min per run; the MLP weights are still merged in every forward pass |
+| All 15 FSFT runs | about 3.6 h |
 
-Inference latency was measured (`results/efficiency.json`) and will be added once the full result files are downloaded. WEMoE builds one merged weight per input, so its batched latency is expected to be well above that of a single BERT.
+## 7.3 Inference latency on one T4
+
+Random inputs of 128 tokens, fp16, mean of 10 forward passes after 3 warm-up passes (`results/efficiency.json`, run v3).
+
+| Deployment | Batch 1: ms/example | Batch 32: ms/example | Peak GPU memory, batch 32 |
+|---|---:|---:|---:|
+| One single-task BERT | 11.6 | 1.61 | 704 MB |
+| Task Arithmetic | 12.7 | 1.63 | 519 MB |
+| WEMoE (full MLP) | 27.8 | 7.31 | 1987 MB |
+| WEMoE (intermediate only) | 18.9 | 4.69 | 1387 MB |
+
+Run v2 measured the same setup. Batch-32 times agreed within about 5%, but batch-1 times differed by up to 27% (intermediate only: 24.1 ms in v2). At batch 1 the GPU is mostly idle and kernel-launch overhead dominates, so treat those figures as rough.
+
+- **One example at a time, WEMoE is about 1.6–2.4× slower than BERT.** The routers and the per-example weight merge add a fixed cost to every layer.
+- **In batches the gap grows to 4.5× (full MLP) and 2.9× (intermediate).** Every example gets its own merged MLP weights, so WEMoE cannot share one matrix multiplication across the batch the way a plain BERT does.
+- **Memory follows the stored task vectors.** Full-MLP WEMoE needs about 2.8× the GPU memory of one BERT.
+
+The single-task row times one expert. Serving all five experts costs the same per example, as long as each input is routed to its expert by its task id.
 
 # 8. Other observations
 
@@ -209,13 +250,32 @@ Tang et al. (ICML 2024) evaluate WEMoE on CLIP-ViT models and eight image classi
 
 The overall shape of the results matches the paper: static merging loses most of the experts' gain, and input-dependent MLP routing recovers a large part of it at the cost of storing the task vectors.
 
-# 11. Next steps
+# 11. Comparison with the earlier DANC project (June 2025)
 
-1. Run the input-independent ablation (§6) and add it to §3 and §6.
-2. Add the latency table (§7.2) from `results/efficiency.json`.
-3. Optionally, a strict few-shot variant with dev capped at k, and more FSFT steps for the intermediate-only model.
-4. Analyse routing per example: does within-task variation follow sentence length, label or errors? Use `predictions_validation.jsonl`.
-5. Build the demo.
+The bachelor project "Hợp nhất các mô hình học đa nhiệm bằng phương pháp Mixture of Experts" (DANC, 06/2025) used the same backbone and tasks. This project replaces its code. The table puts the two sets of numbers side by side (×100, validation).
+
+| | MRPC acc/F1 | RTE | CoLA | SST-2 | QNLI | Avg | Gain over majority |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Experts, DANC | 84.9/89.3 | 72.9 | 60.3 | 92.8 | 91.0 | 80.8 | – |
+| Experts, this run | 82.1/88.1 | 63.2 | 59.1 | 92.2 | 91.2 | 78.2 | – |
+| WEMoE + FSFT, intermediate only, DANC | 75.0/83.1 | 60.6 | 26.7 | 85.8 | 80.8 | 66.6 | about 55 |
+| WEMoE + FSFT, intermediate only, this run | 66.5/76.6 | 59.0 | 41.7 | 86.7 | 86.5 | 69.1 | 54.8 |
+
+The two rows are not directly comparable. DANC differed in four ways:
+- **Model selection.** It chose expert checkpoints and hyperparameters on the validation split that it also reported, and tuned the learning rate per task (8e-5 for RTE). Its expert numbers, especially RTE (72.9), are therefore optimistic.
+- **Split.** Its MRPC single-task score came from the test split, while its merged models used validation.
+- **Data.** Its experts trained on the full train split. Here the few-shot pool and dev are held out, which leaves RTE with 1985 instead of 2490 training pairs.
+- **Merging.** Its code merged the non-MLP weights with an in-place update, which turned Task Arithmetic into an exponential moving average over the experts. It also routed on the [CLS] token instead of the token mean.
+
+Relative to their own experts, the two WEMoE runs recover about the same share of the gain over a constant guess (about 55%). The DANC WEMoE + FSFT row could not be traced to a finished run in its notebooks, whose router training stopped at step 106 and 326 of 500. The DANC numbers are therefore kept as history only. DANC's Adapter-WEMoE and test-time adaptation results are outside the scope of this project and were not re-run.
+
+# 12. Next steps
+
+The planned work is tracked in [`TODO.md`](../../TODO.md). The main items are:
+
+1. **Merge four tasks without RTE**, to test whether RTE interferes with the other tasks (§6).
+2. **Larger few-shot budgets (k = 512, 1024)**, since the k sweep has not levelled off (§4).
+3. **Task-vector norms per module type**, to check the reason for upscaling only `intermediate.dense`.
 
 # Reproducing
 
