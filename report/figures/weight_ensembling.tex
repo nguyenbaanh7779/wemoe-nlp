@@ -1,0 +1,38 @@
+\begin{tikzpicture}[x=1cm,y=1cm]
+  % (a) parameter-level: the gating weight of each expert scales its frozen task vector
+  \node[lane] at (-.3,3.05) {(a) Parameter-level combination (implemented)};
+  \node[plain] (h) at (.1,-1.25) {$h^{\ell}_i$};
+  \node[trn,minimum width=1.2cm] (r) at (1.6,.6) {Router\\$r^{\ell}$};
+  \draw[gate] (h.north) |- (r.west);
+  \node[frz,minimum width=1.3cm,minimum height=.55cm] (w0) at (4.0,2.4) {$W_0^{\ell}$};
+  \draw[gate] (r.east) -- (2.85,.6);
+  \foreach \l/\y/\i in {$\tau_1^{\ell}$/1.6/1,$\tau_2^{\ell}$/.8/2,$\tau_E^{\ell}$/-.25/3}{
+    \node[frz,minimum width=1.3cm,minimum height=.55cm] (t\i) at (4.0,\y) {\l};
+    \node[circle,draw=BrickRed,inner sep=.5pt,font=\scriptsize] (x\i) at (5.4,\y) {$\times$};
+    \draw[dict] (t\i) -- (x\i);
+    \draw[gate] (2.85,.6) |- (5.4,\y-.39) -- (x\i.south);
+  }
+  \node[note] at (4.0,.34) {$\vdots$};
+  \node[note,anchor=east] at (2.8,-.75) {$w^{\ell}_e(x)$};
+  \node[circle,draw=NavyBlue,inner sep=.5pt] (s) at (6.75,.8) {$+$};
+  \draw[dict] (w0.east) -| (s.north);
+  \foreach \i in {1,2,3} \draw[dict] (x\i.east) -- (s);
+  \node[mix,minimum width=2.3cm] (f) at (6.75,-1.25) {$f_{\mathrm{MLP}}\big(h;W^{\ell}(x)\big)$};
+  \draw[dict] (s) -- node[note,right] {$W^{\ell}(x)$} (f);
+  \draw[flow] (h) -- (f);
+  \draw[flow] (f.east) -- ++(.6,0);
+  \node[note] at (3.0,-1.75) {one forward pass; per-input weights};
+  % (b) output-level
+  \draw[black!30,dashed] (8.75,-2) -- (8.75,3.2);
+  \node[lane,text=black!70] at (9,3.05) {(b) Output-level combination (not used)};
+  \node[plain] (x) at (9.45,.8) {$x$};
+  \foreach \l/\y/\i in {$f_1$/2.0/1,$f_2$/1.1/2,$f_E$/-.3/3}{
+    \node[dat,minimum width=1.5cm,minimum height=.55cm] (m\i) at (11.25,\y) {Model \l};
+    \draw[flow,black!50] (x) -- (m\i.west);
+  }
+  \node[note] at (11.25,.47) {$\vdots$};
+  \node[dat,minimum width=1.75cm] (ls) at (14.2,.8) {$\sum_e G_e(x)\,f_e(x)$};
+  \foreach \i in {1,2,3} \draw[flow,black!50] (m\i.east) -- (ls);
+  \draw[flow,black!50] (ls.east) -- ++(.5,0) node[right,note] {$\hat y$};
+  \node[note] at (12.2,-1.25) {$E$ forward passes; combines logits;\\requires a shared output space};
+\end{tikzpicture}

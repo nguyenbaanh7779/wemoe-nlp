@@ -1,0 +1,21 @@
+% Shared TikZ styles: NavyBlue comes from the report theme; the colour roles are constant across figures.
+\usetikzlibrary{arrows.meta,fit,backgrounds,calc,positioning}
+\tikzset{
+  every node/.append style={font=\footnotesize\linespread{1}\selectfont},
+  box/.style={rounded corners=1.5pt,align=center,inner sep=2.5pt,minimum height=.75cm},
+  frz/.style={box,draw=NavyBlue,fill=NavyBlue!8},
+  mix/.style={box,draw=BurntOrange,fill=Goldenrod!25,thick},
+  trn/.style={box,draw=BrickRed,fill=BrickRed!14,thick},
+  dat/.style={box,draw=black!50,fill=black!5},
+  plain/.style={box,draw=none,fill=none},
+  flow/.style={-{Latex[length=2mm]},thick,black!80},
+  gate/.style={-{Latex[length=2mm]},thick,BrickRed},
+  dict/.style={-{Latex[length=2mm]},thick,NavyBlue},
+  group/.style={rounded corners=3pt,draw=black!45,dashed,inner sep=5pt},
+  note/.style={font=\scriptsize\linespread{1}\selectfont,text=black!75,align=center},
+  lane/.style={font=\footnotesize\bfseries,text=NavyBlue,anchor=west}
+}
+\newcommand{\figlegend}{%
+  {\scriptsize\tikz\node[frz,minimum height=.22cm,minimum width=.35cm,inner sep=0]{};~frozen\quad
+  \tikz\node[mix,minimum height=.22cm,minimum width=.35cm,inner sep=0]{};~input-conditioned\quad
+  \tikz\node[trn,minimum height=.22cm,minimum width=.35cm,inner sep=0]{};~trainable during FSFT}}

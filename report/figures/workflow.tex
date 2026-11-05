@@ -1,0 +1,18 @@
+\begin{tikzpicture}[x=1cm,y=1cm,cell/.style={minimum width=3.2cm,minimum height=1.3cm,text width=3.05cm}]
+  \node[lane] at (-1.55,1.0) {Offline: expert preparation and router training};
+  \node[dat,cell] (s1) at (0,0) {\textbf{1. Split train}\\pool / dev /\\expert train};
+  \node[frz,cell] (s2) at (3.6,0) {\textbf{2. Fine-tune}\\five experts;\\best epoch (dev)};
+  \node[frz,cell] (s3) at (7.2,0) {\textbf{3. Task vectors}\\$\tau_e$; select $\lambda$\\on dev};
+  \node[frz,cell] (s4) at (10.8,0) {\textbf{4. Build WEMoE}\\merge with TA;\\upscale MLPs};
+  \node[trn,cell] (s5) at (14.4,0) {\textbf{5. FSFT}\\routers only;\\best step (dev)};
+  \foreach \a/\b in {s1/s2,s2/s3,s3/s4,s4/s5} \draw[flow] (\a) -- (\b);
+  \node[lane] at (-1.55,-1.35) {Inference: one forward pass per input};
+  \node[dat,cell] (i1) at (0,-2.7) {\textbf{Input}\\tokens $x$,\\task id $t$};
+  \node[frz,cell] (i2) at (3.6,-2.7) {\textbf{Embed, attend}\\static weights\\from TA};
+  \node[trn,cell] (i3) at (7.2,-2.7) {\textbf{Route}\\$w^{\ell}(x)$ from\\token states};
+  \node[mix,cell] (i4) at (10.8,-2.7) {\textbf{Merge, apply}\\$W^{\ell}(x)$ per input,\\Add\&Norm};
+  \node[frz,cell] (i5) at (14.4,-2.7) {\textbf{Predict}\\pooler, head $g_t$,\\$\arg\max$};
+  \foreach \a/\b in {i1/i2,i2/i3,i3/i4,i4/i5} \draw[flow] (\a) -- (\b);
+  \draw[flow,dashed] (i4.south) -- ++(0,-.32) -| node[note,pos=.25,below] {repeat for layers $\ell=1,\dots,12$} (i2.south);
+  \draw[dict] (s5.south) -- node[note,right] {\texttt{router.pt}} (i5.north);
+\end{tikzpicture}
