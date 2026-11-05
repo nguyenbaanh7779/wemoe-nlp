@@ -139,14 +139,22 @@ The routing heatmap needs `results/wemoe/full-mean-k256-s0/predictions_validatio
 ## Running the Demo
 
 [`app/demo.py`](../../app/demo.py) is a Gradio app.
-- You pick a task and type a sentence (or a pair of sentences), or choose one of three preset GLUE validation examples per task.
-- It shows the predictions of the single-task expert, Task Arithmetic and WEMoE side by side, and a heatmap of the routing weights WEMoE used for that input (12 layers × 5 experts).
-- The WEMoE dropdown offers the three seed-0 runs of the report, as long as their routers are in `checkpoints/wemoe/`:
-  - `full-mean-k256-s0`, the main result;
-  - `intermediate-mean-k256-s0`;
-  - `full-mean-h0-k256-s0`, the layer-wise ablation.
 
-The demo needs the five experts in `checkpoints/experts/` and at least one of these runs. Each run folder holds only `router.pt` and `wemoe_config.json`, so it is enough to download those small folders from Drive. Downloading `results/` is not needed: `results/baselines.json` in the repository already provides λ.
+**Input.** Type a sentence or a pair of sentences, or pick one of three preset GLUE validation examples per task.
+
+**Task.** Selecting a task is optional.
+- **Auto** (the default) scores the input for every task that fits it: one sentence for CoLA and SST-2, a pair for MRPC, RTE and QNLI.
+- Selecting a task scores the input for that task only.
+
+The routers see only the text, so one input gets one set of routing weights, whichever task it is scored for.
+
+**Output.**
+- A table with the predictions of the single-task expert, Task Arithmetic and WEMoE for each task. For a preset example, each prediction is marked ✓ or ✗ against the gold label.
+- A heatmap of the routing weights WEMoE used for the input (12 layers × 5 experts).
+
+**WEMoE model.** The demo uses the full-MLP model of the report, `full-mean-k256-s0`. Another run can be passed with `--run`.
+
+**Requirements.** The five experts in `checkpoints/experts/` and the run's folder in `checkpoints/wemoe/`, which holds only `router.pt` and `wemoe_config.json`. `results/baselines.json` in the repository provides λ, so `results/` does not need to be downloaded.
 
 ### On your machine
 
@@ -159,7 +167,7 @@ python app/demo.py                 # then open http://127.0.0.1:7860
 - **First start.** Downloads `bert-base-uncased` (440 MB) from the Hugging Face hub.
 - **Loading time.** About 30 s on CPU and a few seconds on MPS.
 - **Memory.** About 5 GB of RAM: the pre-trained BERT, the five experts, Task Arithmetic and one WEMoE run.
-- **Speed.** A prediction takes about 0.2 s. Switching the WEMoE run rebuilds the model, which takes up to 10–20 s.
+- **Speed.** On MPS, one task takes about 0.2 s and Auto mode about 0.7 s (two or three tasks × three models).
 - **Sharing.** `--share` also prints a public `gradio.live` link. `--port` changes the port.
 
 The demo reproduces the saved results. On the 15 preset examples, its WEMoE predictions match `results/wemoe/full-mean-k256-s0/predictions_validation.jsonl`: the labels are identical, the probabilities differ by at most 0.0004 and the routing weights by at most 0.001.

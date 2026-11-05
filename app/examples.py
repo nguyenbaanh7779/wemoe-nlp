@@ -59,9 +59,10 @@ EXAMPLES = {
 }
 
 
-def example_title(example: dict) -> str:
+def example_title(example: dict, task_name: str = "") -> str:
     """Dropdown label: the start of the first text, its gold label and whether WEMoE gets it right."""
     text = example["texts"][0].strip()
     short = text if len(text) <= 60 else text[:57].rstrip() + "..."
     verdict = "WEMoE right" if example["wemoe_correct"] else "WEMoE wrong"
-    return f"#{example['idx']}: {short} [{example['label']}; {verdict}]"
+    prefix = f"{task_name} " if task_name else ""
+    return f"{prefix}#{example['idx']}: {short} [{example['label']}; {verdict}]"

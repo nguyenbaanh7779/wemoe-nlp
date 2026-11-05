@@ -10,14 +10,11 @@ import argparse
 import sys
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import torch  # noqa: E402
-from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm  # noqa: E402
-from matplotlib.patches import Rectangle  # noqa: E402
+import numpy as np
+import torch
+from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm
+from matplotlib.figure import Figure
+from matplotlib.patches import Rectangle
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -26,25 +23,29 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import gradio as gr  # noqa: E402
 
 from examples import EXAMPLES, example_title  # noqa: E402
-from wemoe_nlp.data import DEFAULT_TASKS  # noqa: E402
-from wemoe_nlp.demo import DemoBackend, default_device, demo_runs  # noqa: E402
+from wemoe_nlp.data import DEFAULT_TASKS, TASKS  # noqa: E402
+from wemoe_nlp.demo import DEFAULT_RUN, DemoBackend, default_device  # noqa: E402
 
+AUTO = "auto"
 TASK_NAMES = {"mrpc": "MRPC", "rte": "RTE", "cola": "CoLA", "sst2": "SST-2", "qnli": "QNLI"}
 TASK_QUESTIONS = {
-    "mrpc": "Are the two sentences paraphrases of each other?",
-    "rte": "Does the premise entail the hypothesis?",
-    "cola": "Is the sentence grammatically acceptable English?",
-    "sst2": "Is the movie-review sentence positive or negative?",
-    "qnli": "Does the sentence contain the answer to the question?",
+    "mrpc": "Are the two sentences paraphrases?",
+    "rte": "Does the first sentence entail the second?",
+    "cola": "Is the sentence grammatical?",
+    "sst2": "Is the review positive or negative?",
+    "qnli": "Does the sentence answer the question?",
 }
 FIELD_LABELS = {
+    AUTO: ("Sentence 1", "Sentence 2 (leave empty for a single sentence)"),
     "mrpc": ("Sentence 1", "Sentence 2"),
     "rte": ("Premise", "Hypothesis"),
     "cola": ("Sentence",),
     "sst2": ("Sentence",),
     "qnli": ("Question", "Sentence"),
 }
-DEFAULT_TASK = "sst2"
+AUTO_HELP = ("**Auto**: the input is scored for every task that fits it. "
+             "One sentence: CoLA and SST-2. Two sentences: MRPC, RTE and QNLI.")
+DEFAULT_EXAMPLE = "sst2:1"  # "it 's slow -- very , very slow .": Task Arithmetic gets it wrong, WEMoE right
 
 # Same diverging blue <-> red scale as docs/report/figures/routing.png
 INK, INK_2, SURFACE, HIGHLIGHT = "#0b0b0b", "#52514e", "#fcfcfb", "#eda100"
@@ -56,12 +57,13 @@ INTRO = """
 Five BERT-base models were fine-tuned separately on five GLUE tasks and then merged.
 For one input, this demo compares three models that serve all five tasks:
 
-- **Single-task expert**: the model fine-tuned on the selected task only (the upper bound).
-- **Task Arithmetic**: one static merge, θ₀ + λ·Σ τₜ, the same weights for every input.
-- **WEMoE**: in every layer, a router reads the input and mixes the experts' MLP task vectors with its own weights.
-  The routers were trained on 256 labelled examples per task (FSFT).
+- **Single-task expert**: the model fine-tuned on that task only (the upper bound).
+- **Task Arithmetic**: one static merge, θ₀ + λ·Σ τₜ, with the same weights for every input.
+- **WEMoE** (full MLP): in every layer, a router reads the input and mixes the experts' MLP task vectors with its
+  own weights. The routers were trained on 256 labelled examples per task.
 
-The task only selects the classification head. The routers never see it: they decide from the text alone.
+The routers see only the text, never the task: the task only picks the classification head at the end.
+That is why one input has one set of routing weights, whichever task it is scored for.
 """
 
 
@@ -69,30 +71,72 @@ def pretty(label: str) -> str:
     return label.replace("_", " ")
 
 
-def routing_figure(routing: np.ndarray, experts, task: str, lam: float):
-    """Heatmap of the routing weights of one input: layers (rows) x expert task vectors (columns)."""
+def parse_example(value):
+    """Dropdown value ``"task:index"`` -> (task, example dict)."""
+    task, index = str(value).split(":")
+    return task, EXAMPLES[task][int(index)]
+
+
+def example_choices(task):
+    tasks = DEFAULT_TASKS if task == AUTO else (task,)
+    return [(example_title(ex, TASK_NAMES[t] if task == AUTO else ""), f"{t}:{i}")
+            for t in tasks for i, ex in enumerate(EXAMPLES[t])]
+
+
+def gold_text(gold):
+    if not gold:
+        return ""
+    return f"Gold label ({TASK_NAMES[gold['task']]}, GLUE validation #{gold['idx']}): **{pretty(gold['label'])}**"
+
+
+def results_table(result, gold, lam: float) -> str:
+    header = (f"| Task | Question | Single-task expert | Task Arithmetic (λ = {lam:g}) | WEMoE |\n"
+              "|---|---|---|---|---|")
+    rows = []
+    for task in result.tasks:
+        cells = []
+        for model in ("expert", "task_arithmetic", "wemoe"):
+            label = result.predicted_label(task, model)
+            confidence = max(result.probs[task][model])
+            mark = ""
+            if gold and gold["task"] == task:
+                mark = " ✓" if label == gold["label"] else " ✗"
+            cells.append(f"{pretty(label)} ({confidence:.2f}){mark}")
+        rows.append(f"| **{TASK_NAMES[task]}** | {TASK_QUESTIONS[task]} | " + " | ".join(cells) + " |")
+    note = "\n\nNumbers are the probability of the predicted label."
+    if gold and gold["task"] in result.tasks:
+        note += " ✓ / ✗: agrees / disagrees with the gold label."
+    return "\n".join([header] + rows) + note
+
+
+def routing_figure(routing: np.ndarray, experts, task) -> Figure:
+    """Heatmap of the routing weights of one input: layers (rows) x expert task vectors (columns).
+
+    A plain ``Figure`` (not pyplot), so figures are freed once Gradio has rendered them.
+    """
     layers, num_experts = routing.shape
     limit = max(float(np.abs(routing).max()), 0.5)
-    fig, ax = plt.subplots(figsize=(5.4, 5.6))
-    fig.patch.set_facecolor(SURFACE)
+    fig = Figure(figsize=(5.4, 5.6), dpi=150, facecolor=SURFACE)
+    ax = fig.subplots()
     image = ax.imshow(routing, cmap=DIVERGING, norm=TwoSlopeNorm(vcenter=0.0, vmin=-limit, vmax=limit), aspect="auto")
     for i in range(layers):
         for j in range(num_experts):
             value = routing[i, j]
             color = "white" if abs(value) > 0.6 * limit else INK
             ax.text(j, i, f"{value:.2f}", ha="center", va="center", fontsize=7.5, color=color)
+    xlabel = "Expert task vector"
     if task in experts:
         column = list(experts).index(task)
         ax.add_patch(Rectangle((column - 0.5, -0.5), 1, layers, fill=False, edgecolor=HIGHLIGHT, linewidth=2.5))
+        xlabel += f" ({TASK_NAMES[task]} outlined)"
     ax.set_xticks(range(num_experts), [TASK_NAMES.get(e, e) for e in experts], fontsize=8.5, color=INK_2)
     ax.set_yticks(range(layers), [str(i + 1) for i in range(layers)], fontsize=8, color=INK_2)
-    ax.set_xlabel("Expert task vector (column of the selected task outlined)", fontsize=8.5, color=INK_2)
+    ax.set_xlabel(xlabel, fontsize=8.5, color=INK_2)
     ax.set_ylabel("Layer", fontsize=8.5, color=INK_2)
     ax.tick_params(length=0)
     for spine in ax.spines.values():
         spine.set_visible(False)
-    ax.set_title(f"Routing weights for this input (Task Arithmetic uses {lam:g} everywhere)",
-                 fontsize=9, color=INK, loc="left")
+    ax.set_title("WEMoE routing weights for this input", fontsize=9, color=INK, loc="left")
     bar = fig.colorbar(image, ax=ax, fraction=0.05, pad=0.03)
     bar.outline.set_visible(False)
     bar.ax.tick_params(labelsize=7, colors=INK_2)
@@ -100,93 +144,87 @@ def routing_figure(routing: np.ndarray, experts, task: str, lam: float):
     return fig
 
 
-def routing_summary(routing: np.ndarray, experts, task: str) -> str:
+def routing_summary(routing: np.ndarray, experts, task, lam: float) -> str:
     means = routing.mean(axis=0)
     order = np.argsort(-means)
     ranked = ", ".join(f"{TASK_NAMES.get(experts[i], experts[i])} {means[i]:+.2f}" for i in order)
-    top = experts[order[0]]
-    own = means[list(experts).index(task)] if task in experts else None
-    lines = [f"**Mean weight per expert over the 12 layers:** {ranked}."]
-    if top == task:
-        lines.append(f"The router gives the most weight to the {TASK_NAMES[task]} expert, the task of this input.")
-    elif own is not None:
-        lines.append(f"The router gives the most weight to the {TASK_NAMES.get(top, top)} expert, "
-                     f"not to the {TASK_NAMES[task]} expert ({own:+.2f}).")
+    lines = [f"**Mean weight per expert over the 12 layers:** {ranked}. "
+             f"Task Arithmetic uses {lam:g} for every expert in every layer."]
+    if task in experts:
+        top = experts[order[0]]
+        if top == task:
+            lines.append(f"The router gives the most weight to the {TASK_NAMES[task]} expert.")
+        else:
+            own = means[list(experts).index(task)]
+            lines.append(f"The router gives the most weight to the {TASK_NAMES.get(top, top)} expert, "
+                         f"not to the {TASK_NAMES[task]} expert ({own:+.2f}).")
     return "\n\n".join(lines)
 
 
-def build_app(backend: DemoBackend, runs: dict) -> gr.Blocks:
-    run_choices = [(label, name) for name, label in runs.items()]
-    default_run = next(iter(runs))
+def build_app(backend: DemoBackend) -> gr.Blocks:
     lam = backend.task_arithmetic_lambda
 
-    def example_choices(task):
-        return [(example_title(ex), i) for i, ex in enumerate(EXAMPLES[task])]
-
-    def gold_text(task, example):
-        return f"Gold label: **{pretty(example['label'])}** (GLUE validation #{example['idx']})"
-
-    def on_task(task):
-        labels = FIELD_LABELS[task]
-        first = EXAMPLES[task][0]
-        texts = list(first["texts"]) + [""] * (2 - len(first["texts"]))
-        return (
-            f"**{TASK_NAMES[task]}**: {TASK_QUESTIONS[task]}",
-            gr.update(label=labels[0], value=texts[0]),
-            gr.update(label=labels[-1], value=texts[1], visible=len(labels) == 2),
-            gr.update(choices=example_choices(task), value=0),
-            gold_text(task, first),
-        )
-
-    def on_example(task, index):
-        if index is None:
-            return gr.update(), gr.update(), ""
-        example = EXAMPLES[task][int(index)]
+    def fill(task, example_value):
+        """Texts and gold label of an example, for the field layout of ``task``."""
+        example_task, example = parse_example(example_value)
         texts = list(example["texts"]) + [""] * (2 - len(example["texts"]))
-        return texts[0], texts[1], gold_text(task, example)
+        gold = {"task": example_task, "label": example["label"], "idx": example["idx"]}
+        return texts[0], texts[1], gold, gold_text(gold)
 
-    def on_predict(task, run, text_a, text_b):
-        texts = [text_a, text_b][: len(FIELD_LABELS[task])]
+    def on_task(task, example_value):
+        labels = FIELD_LABELS[task]
+        if task != AUTO and (not example_value or parse_example(example_value)[0] != task):
+            example_value = f"{task}:0"
+        question = AUTO_HELP if task == AUTO else f"**{TASK_NAMES[task]}**: {TASK_QUESTIONS[task]}"
+        text_a, text_b, gold, gold_md = fill(task, example_value)
+        return (question, gr.update(label=labels[0], value=text_a),
+                gr.update(label=labels[-1], value=text_b, visible=len(labels) == 2),
+                gr.update(choices=example_choices(task), value=example_value), gold, gold_md)
+
+    def on_example(task, example_value):
+        if not example_value:
+            return gr.update(), gr.update(), gr.update(), gr.update()
+        return fill(task, example_value)
+
+    def on_predict(task, text_a, text_b, gold):
+        if task == AUTO:
+            texts, tasks = [text_a] + ([text_b] if text_b.strip() else []), None
+        else:
+            texts, tasks = [text_a, text_b][: len(TASKS[task].text_fields)], [task]
         try:
-            result = backend.predict(task, texts, run)
+            result = backend.predict(texts, tasks)
         except ValueError as error:
             raise gr.Error(str(error))
-        outputs = [{pretty(name): float(p) for name, p in zip(result.label_names, result.probs[key])}
-                   for key in ("expert", "task_arithmetic", "wemoe")]
-        figure = routing_figure(result.routing, result.expert_names, task, lam)
-        summary = routing_summary(result.routing, result.expert_names, task)
-        return (*outputs, figure, summary)
+        selected = None if task == AUTO else task
+        return (results_table(result, gold, lam), routing_figure(result.routing, result.expert_names, selected),
+                routing_summary(result.routing, result.expert_names, selected, lam))
 
-    first = EXAMPLES[DEFAULT_TASK][0]
+    default_a, default_b, default_gold, default_gold_md = fill(AUTO, DEFAULT_EXAMPLE)
     with gr.Blocks(title="WEMoE demo") as app:
         gr.Markdown(INTRO)
+        gold = gr.State(default_gold)
         with gr.Row():
-            with gr.Column(scale=5):
-                task = gr.Radio([(TASK_NAMES[t], t) for t in backend.tasks], value=DEFAULT_TASK, label="Task")
-                run = gr.Dropdown(run_choices, value=default_run, label="WEMoE model",
-                                  info="Switching rebuilds the model (10-20 s).")
-                question = gr.Markdown(f"**{TASK_NAMES[DEFAULT_TASK]}**: {TASK_QUESTIONS[DEFAULT_TASK]}")
-                example = gr.Dropdown(example_choices(DEFAULT_TASK), value=0, label="Example from GLUE validation")
-                text_a = gr.Textbox(first["texts"][0], label=FIELD_LABELS[DEFAULT_TASK][0], lines=2)
-                text_b = gr.Textbox("", label="Second text", lines=2, visible=False)
-                gold = gr.Markdown(gold_text(DEFAULT_TASK, first))
+            with gr.Column(scale=4):
+                task = gr.Radio([("Auto", AUTO)] + [(TASK_NAMES[t], t) for t in backend.tasks], value=AUTO,
+                                label="Task")
+                question = gr.Markdown(AUTO_HELP)
+                example = gr.Dropdown(example_choices(AUTO), value=DEFAULT_EXAMPLE, label="Example from GLUE validation")
+                text_a = gr.Textbox(default_a, label=FIELD_LABELS[AUTO][0], lines=2)
+                text_b = gr.Textbox(default_b, label=FIELD_LABELS[AUTO][1], lines=2)
+                gold_md = gr.Markdown(default_gold_md)
                 predict = gr.Button("Predict", variant="primary")
-            with gr.Column(scale=5):
-                with gr.Row():
-                    expert_out = gr.Label(label="Single-task expert", num_top_classes=2)
-                    ta_out = gr.Label(label=f"Task Arithmetic (λ = {lam:g})", num_top_classes=2)
-                    wemoe_out = gr.Label(label="WEMoE", num_top_classes=2)
-                plot = gr.Plot(label="Routing weights")
+            with gr.Column(scale=6):
+                table = gr.Markdown()
+                plot = gr.Plot(label="Routing weights", format="png")  # the default WebP smears the cells
                 summary = gr.Markdown()
 
-        outputs = [expert_out, ta_out, wemoe_out, plot, summary]
-        inputs = [task, run, text_a, text_b]
-        task.change(on_task, task, [question, text_a, text_b, example, gold])
-        example.input(on_example, [task, example], [text_a, text_b, gold])
-        text_a.input(lambda: "", None, gold)
-        text_b.input(lambda: "", None, gold)
+        inputs, outputs = [task, text_a, text_b, gold], [table, plot, summary]
+        task.change(on_task, [task, example], [question, text_a, text_b, example, gold, gold_md]).then(
+            on_predict, inputs, outputs)
+        example.input(on_example, [task, example], [text_a, text_b, gold, gold_md]).then(on_predict, inputs, outputs)
+        for box in (text_a, text_b):
+            box.input(lambda: (None, ""), None, [gold, gold_md])  # edited text: the gold label no longer applies
         predict.click(on_predict, inputs, outputs)
-        run.change(on_predict, inputs, outputs)
         app.load(on_predict, inputs, outputs)
     return app
 
@@ -195,24 +233,20 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--checkpoint-dir", default=str(ROOT / "checkpoints"))
     parser.add_argument("--results-dir", default=str(ROOT / "results"))
+    parser.add_argument("--run", default=DEFAULT_RUN, help="WEMoE run in checkpoints/wemoe/ (default: %(default)s)")
     parser.add_argument("--device", default=None, help="cuda, mps or cpu (default: the first one available)")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=7860)
     parser.add_argument("--share", action="store_true", help="create a public gradio.live link")
     args = parser.parse_args()
 
-    runs = demo_runs(args.checkpoint_dir)
-    if not runs:
-        sys.exit(f"None of the demo runs has a checkpoint in {Path(args.checkpoint_dir) / 'wemoe'}")
     device = torch.device(args.device) if args.device else default_device()
-    print(f"Loading the experts, Task Arithmetic and WEMoE on {device} (about 30 s)...", flush=True)
-    backend = DemoBackend.from_checkpoints(args.checkpoint_dir, args.results_dir, DEFAULT_TASKS, device=device)
-    warmup = EXAMPLES[DEFAULT_TASK][0]["texts"]
-    backend.predict(DEFAULT_TASK, warmup, next(iter(runs)))  # builds the default WEMoE run
-    print(f"Runs: {', '.join(runs)}", flush=True)
-
-    app = build_app(backend, runs)
-    app.queue(default_concurrency_limit=1)  # one model in memory, one request at a time
+    print(f"Loading the experts, Task Arithmetic and WEMoE ({args.run}) on {device}...", flush=True)
+    backend = DemoBackend.from_checkpoints(args.checkpoint_dir, args.results_dir, args.run, DEFAULT_TASKS,
+                                           device=device)
+    backend.predict(list(parse_example(DEFAULT_EXAMPLE)[1]["texts"]))  # warm-up
+    app = build_app(backend)
+    app.queue(default_concurrency_limit=1)  # one request at a time
     app.launch(server_name=args.host, server_port=args.port, share=args.share)
 
 
