@@ -14,13 +14,13 @@
     "trainable_params_finetuning": 547418890,
     "latency": {
       "batch_1": {
-        "ms_per_batch": 11.77,
-        "ms_per_example": 11.768,
+        "ms_per_batch": 11.64,
+        "ms_per_example": 11.64,
         "peak_memory_mb": 614.5
       },
       "batch_32": {
-        "ms_per_batch": 48.95,
-        "ms_per_example": 1.53,
+        "ms_per_batch": 51.54,
+        "ms_per_example": 1.611,
         "peak_memory_mb": 704.4
       }
     },
@@ -33,13 +33,13 @@
     "trainable_params": 0,
     "latency": {
       "batch_1": {
-        "ms_per_batch": 14.58,
-        "ms_per_example": 14.577,
+        "ms_per_batch": 12.67,
+        "ms_per_example": 12.673,
         "peak_memory_mb": 435.3
       },
       "batch_32": {
-        "ms_per_batch": 49.46,
-        "ms_per_example": 1.546,
+        "ms_per_batch": 52.08,
+        "ms_per_example": 1.627,
         "peak_memory_mb": 518.9
       }
     },
@@ -61,13 +61,13 @@
     },
     "latency": {
       "batch_1": {
-        "ms_per_batch": 25.07,
-        "ms_per_example": 25.069,
+        "ms_per_batch": 27.83,
+        "ms_per_example": 27.827,
         "peak_memory_mb": 1615.1
       },
       "batch_32": {
-        "ms_per_batch": 229.96,
-        "ms_per_example": 7.186,
+        "ms_per_batch": 233.94,
+        "ms_per_example": 7.311,
         "peak_memory_mb": 1987.1
       }
     },
@@ -89,13 +89,13 @@
     },
     "latency": {
       "batch_1": {
-        "ms_per_batch": 24.05,
-        "ms_per_example": 24.053,
+        "ms_per_batch": 18.9,
+        "ms_per_example": 18.899,
         "peak_memory_mb": 1060.9
       },
       "batch_32": {
-        "ms_per_batch": 147.36,
-        "ms_per_example": 4.605,
+        "ms_per_batch": 150.2,
+        "ms_per_example": 4.694,
         "peak_memory_mb": 1386.9
       }
     },
