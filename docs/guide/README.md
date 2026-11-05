@@ -136,6 +136,40 @@ The routing heatmap needs `results/wemoe/full-mean-k256-s0/predictions_validatio
 
 `.gitignore` already excludes the checkpoints (`checkpoints/`, `*.safetensors`, `*.pt`) and the large prediction files (`results/**/*.jsonl`). `git add results/ notebooks/` therefore adds only the small files: `summary.md`, the `.json` results and the notebook.
 
+## Running the Demo
+
+[`app/demo.py`](../../app/demo.py) is a Gradio app.
+- You pick a task and type a sentence (or a pair of sentences), or choose one of three preset GLUE validation examples per task.
+- It shows the predictions of the single-task expert, Task Arithmetic and WEMoE side by side, and a heatmap of the routing weights WEMoE used for that input (12 layers × 5 experts).
+- The WEMoE dropdown offers the three seed-0 runs of the report, as long as their routers are in `checkpoints/wemoe/`:
+  - `full-mean-k256-s0`, the main result;
+  - `intermediate-mean-k256-s0`;
+  - `full-mean-h0-k256-s0`, the layer-wise ablation.
+
+The demo needs the five experts in `checkpoints/experts/` and at least one of these runs. Each run folder holds only `router.pt` and `wemoe_config.json`, so it is enough to download those small folders from Drive. Downloading `results/` is not needed: `results/baselines.json` in the repository already provides λ.
+
+### On your machine
+
+```bash
+pip install -r requirements.txt -r requirements-demo.txt
+python app/demo.py                 # then open http://127.0.0.1:7860
+```
+
+- **Device.** The demo picks the first device available: CUDA, then Apple MPS, then CPU. To choose one, pass `--device cpu`.
+- **First start.** Downloads `bert-base-uncased` (440 MB) from the Hugging Face hub.
+- **Loading time.** About 30 s on CPU and a few seconds on MPS.
+- **Memory.** About 5 GB of RAM: the pre-trained BERT, the five experts, Task Arithmetic and one WEMoE run.
+- **Speed.** A prediction takes about 0.2 s. Switching the WEMoE run rebuilds the model, which takes up to 10–20 s.
+- **Sharing.** `--share` also prints a public `gradio.live` link. `--port` changes the port.
+
+The demo reproduces the saved results. On the 15 preset examples, its WEMoE predictions match `results/wemoe/full-mean-k256-s0/predictions_validation.jsonl`: the labels are identical, the probabilities differ by at most 0.0004 and the routing weights by at most 0.001.
+
+### On Colab
+
+Run the setup cells, then the last cell of the notebook, **Optional: interactive demo**. It installs Gradio, loads the models from Drive and prints a public link. The cell keeps running until you stop it.
+
+The clone cell must check out a branch that contains `app/`.
+
 ## Troubleshooting
 
 - **`Could not open requirements file: requirements.txt` and `git log` shows `Initial commit`.** `/content/wemoe-nlp` already exists from an earlier clone of a different branch. The clone cell only clones when that folder is missing, so changing `BRANCH` has no effect. Delete the old clone and rerun the clone cell:

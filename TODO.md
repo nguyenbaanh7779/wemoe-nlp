@@ -26,4 +26,4 @@ Results and context for these items are in the [report](docs/report/README.md).
 - [ ] A strict few-shot variant with dev capped at k.
 - [ ] More FSFT steps for the intermediate-only model.
 - [ ] Analyse routing per example: does within-task variation follow sentence length, label or errors? Use `predictions_validation.jsonl`.
-- [ ] Build the demo.
+- [x] Build the demo (`app/demo.py`; see the [guide](docs/guide/README.md#running-the-demo)).
