@@ -1,0 +1,81 @@
+{
+  "task": "sst2",
+  "data_config": {
+    "model_name": "bert-base-uncased",
+    "max_length": 128,
+    "split_seed": 42,
+    "fewshot_pool_size": 256,
+    "dev_fraction": 0.1,
+    "dev_max": 1000,
+    "max_train_examples": null,
+    "max_eval_examples": null
+  },
+  "train_config": {
+    "lr": 2e-05,
+    "batch_size": 32,
+    "eval_batch_size": 64,
+    "num_epochs": 3,
+    "warmup_ratio": 0.1,
+    "weight_decay": 0.01,
+    "max_grad_norm": 1.0,
+    "fp16": true,
+    "seed": 42
+  },
+  "split_sizes": {
+    "expert_train": 66093,
+    "dev": 1000,
+    "validation": 872
+  },
+  "label_names": [
+    "negative",
+    "positive"
+  ],
+  "best_epoch": 2,
+  "dev": {
+    "accuracy": 0.944,
+    "score": 0.944,
+    "n": 1000
+  },
+  "validation": {
+    "accuracy": 0.9220183486238532,
+    "score": 0.9220183486238532,
+    "n": 872
+  },
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.251153074399661,
+      "dev": {
+        "accuracy": 0.935,
+        "score": 0.935,
+        "n": 1000
+      }
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.11476558553742827,
+      "dev": {
+        "accuracy": 0.944,
+        "score": 0.944,
+        "n": 1000
+      }
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.0716238497288281,
+      "dev": {
+        "accuracy": 0.94,
+        "score": 0.94,
+        "n": 1000
+      }
+    }
+  ],
+  "train_seconds": 657.7,
+  "checkpoint": "/content/drive/MyDrive/wemoe-nlp/checkpoints/experts/sst2",
+  "versions": {
+    "torch": "2.11.0+cu130",
+    "transformers": "5.20.2",
+    "datasets": "4.8.5",
+    "scikit-learn": "1.6.1"
+  }
+}

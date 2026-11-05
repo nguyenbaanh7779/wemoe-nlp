@@ -36,6 +36,8 @@ Use either way:
 - **File → Upload notebook**, then pick `notebooks/colab_run.ipynb` from your machine. Colab saves the uploaded copy to `MyDrive/Colab Notebooks/colab_run.ipynb`, and all later edits and outputs go to that copy. The local file is not changed. Reopen the Drive copy next time; uploading again creates a new copy without the old outputs.
 - **File → Open notebook → GitHub**, then pick the repository and branch. This copy is **not saved anywhere** until you choose **File → Save a copy in Drive**. If you close the tab before saving, you lose your edits and all outputs.
 
+The copy saved on Drive does not follow the repository. When `notebooks/colab_run.ipynb` gets new cells on `main` (for example the router ablation), open the notebook again from GitHub or upload it again. Otherwise the new cells are missing, even though the clone cell fetches the latest code.
+
 Then select **Runtime → Change runtime type → T4 GPU** (or better).
 
 ### 3. Run the cells in order

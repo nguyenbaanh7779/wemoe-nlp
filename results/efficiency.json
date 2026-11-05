@@ -1,0 +1,104 @@
+{
+  "tasks": [
+    "mrpc",
+    "rte",
+    "cola",
+    "sst2",
+    "qnli"
+  ],
+  "single_task_models": {
+    "num_checkpoints": 5,
+    "stored_params": 547418890,
+    "stored_bytes": 2189675560,
+    "params_per_model": 109483778,
+    "trainable_params_finetuning": 547418890,
+    "latency": {
+      "batch_1": {
+        "ms_per_batch": 11.77,
+        "ms_per_example": 11.768,
+        "peak_memory_mb": 614.5
+      },
+      "batch_32": {
+        "ms_per_batch": 48.95,
+        "ms_per_example": 1.53,
+        "peak_memory_mb": 704.4
+      }
+    },
+    "fraction_of_single_task_models": 1.0
+  },
+  "task_arithmetic": {
+    "num_checkpoints": 1,
+    "stored_params": 109489930,
+    "stored_bytes": 437959720,
+    "trainable_params": 0,
+    "latency": {
+      "batch_1": {
+        "ms_per_batch": 14.58,
+        "ms_per_example": 14.577,
+        "peak_memory_mb": 435.3
+      },
+      "batch_32": {
+        "ms_per_batch": 49.46,
+        "ms_per_example": 1.546,
+        "peak_memory_mb": 518.9
+      }
+    },
+    "fraction_of_single_task_models": 0.2
+  },
+  "wemoe_full": {
+    "num_checkpoints": 1,
+    "stored_params": 399969094,
+    "stored_bytes": 1599876376,
+    "expected_params": 399969094,
+    "trainable_params": 7133244,
+    "breakdown": {
+      "shared_backbone": 52813056,
+      "base_mlp": 56669184,
+      "task_vectors": 283345920,
+      "routers": 7133244,
+      "heads": 7690,
+      "total": 399969094
+    },
+    "latency": {
+      "batch_1": {
+        "ms_per_batch": 25.07,
+        "ms_per_example": 25.069,
+        "peak_memory_mb": 1615.1
+      },
+      "batch_32": {
+        "ms_per_batch": 229.96,
+        "ms_per_example": 7.186,
+        "peak_memory_mb": 1987.1
+      }
+    },
+    "fraction_of_single_task_models": 0.7306
+  },
+  "wemoe_intermediate": {
+    "num_checkpoints": 1,
+    "stored_params": 258365254,
+    "stored_bytes": 1033461016,
+    "expected_params": 258365254,
+    "trainable_params": 7133244,
+    "breakdown": {
+      "shared_backbone": 81133824,
+      "base_mlp": 28348416,
+      "task_vectors": 141742080,
+      "routers": 7133244,
+      "heads": 7690,
+      "total": 258365254
+    },
+    "latency": {
+      "batch_1": {
+        "ms_per_batch": 24.05,
+        "ms_per_example": 24.053,
+        "peak_memory_mb": 1060.9
+      },
+      "batch_32": {
+        "ms_per_batch": 147.36,
+        "ms_per_example": 4.605,
+        "peak_memory_mb": 1386.9
+      }
+    },
+    "fraction_of_single_task_models": 0.472
+  }
+}
