@@ -28,17 +28,35 @@ from wemoe_nlp.demo import DEFAULT_RUN, DemoBackend, default_device  # noqa: E40
 
 AUTO = "auto"
 TASK_NAMES = {"mrpc": "MRPC", "rte": "RTE", "cola": "CoLA", "sst2": "SST-2", "qnli": "QNLI"}
-TASK_QUESTIONS = {
-    "mrpc": "Are the two sentences paraphrases?",
-    "rte": "Does the first sentence entail the second?",
-    "cola": "Is the sentence grammatical?",
-    "sst2": "Is the review positive or negative?",
+TASK_QUESTIONS = {  # short form, for the "What it asks" column of the results table
+    "mrpc": "Do the two sentences mean the same thing?",
+    "rte": "Does sentence 1 imply sentence 2?",
+    "cola": "Is the sentence grammatical English?",
+    "sst2": "Is the movie review positive or negative?",
     "qnli": "Does the sentence answer the question?",
+}
+TASK_DESCRIPTIONS = {  # shown under the task selector
+    "mrpc": ("**MRPC** (Microsoft Research Paraphrase Corpus): *paraphrase detection*.\n\n"
+             "Two sentences from news articles: do they say the same thing?\n\n"
+             "Labels: **equivalent** / **not equivalent**."),
+    "rte": ("**RTE** (Recognizing Textual Entailment): *textual entailment*.\n\n"
+            "Can sentence 2 be inferred from sentence 1?\n\n"
+            "Labels: **entailment** / **not entailment**. Only about 2.5k training pairs: the hardest task here."),
+    "cola": ("**CoLA** (Corpus of Linguistic Acceptability): *grammatical acceptability*.\n\n"
+             "Is the sentence grammatical English? The sentences come from linguistics textbooks.\n\n"
+             "Labels: **acceptable** / **unacceptable**. Scored with the Matthews correlation (MCC)."),
+    "sst2": ("**SST-2** (Stanford Sentiment Treebank): *sentiment analysis*.\n\n"
+             "Is a sentence from a movie review positive or negative? "
+             "The text is lower-cased, with spaces before punctuation.\n\n"
+             "Labels: **positive** / **negative**."),
+    "qnli": ("**QNLI** (Question NLI, built from SQuAD on Wikipedia): *question answering as classification*.\n\n"
+             "Does the sentence contain the answer to the question?\n\n"
+             "Labels: **entailment** (it answers the question) / **not entailment**."),
 }
 FIELD_LABELS = {
     AUTO: ("Sentence 1", "Sentence 2 (leave empty for a single sentence)"),
     "mrpc": ("Sentence 1", "Sentence 2"),
-    "rte": ("Premise", "Hypothesis"),
+    "rte": ("Sentence 1", "Sentence 2"),
     "cola": ("Sentence",),
     "sst2": ("Sentence",),
     "qnli": ("Question", "Sentence"),
@@ -93,7 +111,7 @@ def gold_text(gold):
 
 
 def results_table(result, gold, lam: float) -> str:
-    header = (f"| Task | Question | Single-task expert | Task Arithmetic (λ = {lam:g}) | WEMoE |\n"
+    header = (f"| Task | What it asks | Single-task expert | Task Arithmetic (λ = {lam:g}) | WEMoE |\n"
               "|---|---|---|---|---|")
     rows = []
     for task in result.tasks:
@@ -213,7 +231,7 @@ def build_app(backend: DemoBackend) -> gr.Blocks:
         labels = FIELD_LABELS[task]
         if task != AUTO and (not example_value or parse_example(example_value)[0] != task):
             example_value = f"{task}:0"
-        question = AUTO_HELP if task == AUTO else f"**{TASK_NAMES[task]}**: {TASK_QUESTIONS[task]}"
+        question = AUTO_HELP if task == AUTO else TASK_DESCRIPTIONS[task]
         text_a, text_b, gold, gold_md = fill(task, example_value)
         return (question, gr.update(label=labels[0], value=text_a),
                 gr.update(label=labels[-1], value=text_b, visible=len(labels) == 2),
@@ -247,7 +265,7 @@ def build_app(backend: DemoBackend) -> gr.Blocks:
             with gr.Column(scale=4):
                 task = gr.Radio([(TASK_NAMES[t], t) for t in backend.tasks] + [("Auto", AUTO)], value=DEFAULT_TASK,
                                 label="Task")
-                question = gr.Markdown(f"**{TASK_NAMES[DEFAULT_TASK]}**: {TASK_QUESTIONS[DEFAULT_TASK]}")
+                question = gr.Markdown(TASK_DESCRIPTIONS[DEFAULT_TASK])
                 example = gr.Dropdown(example_choices(DEFAULT_TASK), value=DEFAULT_EXAMPLE,
                                       label="Example from GLUE validation")
                 text_a = gr.Textbox(default_a, label=default_labels[0], lines=2)
