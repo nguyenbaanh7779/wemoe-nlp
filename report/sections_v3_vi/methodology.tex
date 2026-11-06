@@ -1,0 +1,113 @@
+\chapter{Phương pháp thực nghiệm}
+\label{ch:method}
+
+\section{Năm tác vụ nhị phân của GLUE và dữ liệu}
+
+Thực nghiệm dùng năm tác vụ nhị phân của bộ đánh giá General Language Understanding Evaluation (GLUE)~\cite{wang2019glue}, được nạp qua thư viện Hugging Face Datasets~\cite{lhoest2021datasets} và liệt kê trong Bảng~\ref{tab:data}: MRPC~\cite{dolan2005mrpc}, RTE~\cite{dagan2006rte}, CoLA~\cite{warstadt2019cola}, SST-2~\cite{socher2013sst} và QNLI, được xây dựng từ SQuAD~\cite{rajpurkar2016squad}. CoLA và SST-2 nhận một câu, còn MRPC, RTE và QNLI nhận một cặp. Đầu vào được tách token và cắt còn tối đa 128 token. Các tác vụ khác nhau nhiều về kích thước, như Bảng~\ref{tab:split} cho thấy, và về điểm mà một dự đoán hằng đạt được, như cột cuối của Bảng~\ref{tab:data} cho thấy.
+
+\begin{table}[htbp]
+  \centering\tablestyle
+  \caption{Năm tác vụ GLUE. ``Đa số \%'' là độ chính xác trên tập kiểm định khi luôn dự đoán nhãn phổ biến nhất.}
+  \label{tab:data}
+  \setlength{\tabcolsep}{3.5pt}\begin{tabularx}{\linewidth}{l X l l l r}
+    \toprule
+    Tác vụ & Xác định liệu\ldots & Trường đầu vào & Nhãn & Độ đo & Đa số \%\\
+    \midrule
+    MRPC & hai câu có cùng nghĩa & sentence1, sentence2 & not\_equivalent / equivalent & acc + F1 & 68.4\\
+    RTE & một câu suy ra được câu kia & sentence1, sentence2 & entailment / not\_entailment & accuracy & 52.7\\
+    CoLA & một câu đúng ngữ pháp & sentence & unacceptable / acceptable & MCC & 69.1\\
+    SST-2 & một câu tích cực hay tiêu cực & sentence & negative / positive & accuracy & 50.9\\
+    QNLI & một câu trả lời được câu hỏi & question, sentence & entailment / not\_entailment & accuracy & 50.5\\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\section{Chia dữ liệu và quy trình thực nghiệm}
+\label{sec:protocol}
+
+Tập huấn luyện chính thức của mỗi tác vụ được hoán vị một lần với seed 42 và chia thành ba phần rời nhau (Bảng~\ref{tab:split}). Vì vậy, bốn loại dữ liệu có vai trò riêng biệt:
+
+\begin{itemize}
+  \item \textbf{Dữ liệu huấn luyện chuyên gia} là phần còn lại sau hai phần dự trữ bên dưới. Chỉ các chuyên gia huấn luyện trên phần này.
+  \item \textbf{Tập few-shot} (few-shot pool) gồm 256 mẫu có nhãn mỗi tác vụ, và $k$ mẫu trong đó huấn luyện các bộ định tuyến. Các chuyên gia không bao giờ thấy tập này.
+  \item \textbf{Tập phát triển} (dev) bằng 10\% tập huấn luyện chính thức, tối đa 1\,000 mẫu. Mọi lựa chọn đều dựa vào tập này: epoch của chuyên gia, $\lambda$ và bước FSFT.
+  \item \textbf{Tập kiểm định chính thức} (official validation) chỉ dùng cho điểm được báo cáo.
+\end{itemize}
+
+Các tập kiểm thử của GLUE không được dùng. Nhãn của chúng bị ẩn trong dữ liệu ở bốn tác vụ, và nhãn kiểm thử của MRPC cũng không được sử dụng. Quy trình này ngăn các dạng rò rỉ dữ liệu chính, nhưng có chi phí: RTE, tác vụ nhỏ nhất, chỉ còn 1\,985 trong 2\,490 cặp huấn luyện cho chuyên gia của nó.
+
+\begin{table}[htbp]
+  \centering\tablestyle
+  \caption{Cách chia dữ liệu theo tác vụ. Dòng cuối ghi mục đích sử dụng của từng tập.}
+  \label{tab:split}
+  \begin{tabular}{l r r r r r}
+    \toprule
+    Tác vụ & Train chính thức & Tập few-shot & Dev & Train chuyên gia & Kiểm định chính thức\\
+    \midrule
+    MRPC & 3\,668 & 256 & 367 & 3\,045 & 408\\
+    RTE & 2\,490 & 256 & 249 & 1\,985 & 277\\
+    CoLA & 8\,551 & 256 & 855 & 7\,440 & 1\,043\\
+    SST-2 & 67\,349 & 256 & 1\,000 & 66\,093 & 872\\
+    QNLI & 104\,743 & 256 & 1\,000 & 103\,487 & 5\,463\\
+    \midrule
+    \textbf{Dùng cho} & & \textbf{FSFT} & \textbf{Lựa chọn} & \textbf{Chuyên gia} & \textbf{Báo cáo}\\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Huấn luyện năm chuyên gia}
+
+Mỗi chuyên gia tinh chỉnh mọi lớp của \texttt{bert-base-uncased} và một head hai lớp mới bằng cross-entropy trên dữ liệu huấn luyện chuyên gia của nó. Cả năm dùng chung một công thức, ở cột đầu của Bảng~\ref{tab:config}, không tinh chỉnh riêng theo tác vụ, và epoch tốt nhất trong ba epoch được chọn trên dev theo điểm tác vụ. AdamW~\cite{loshchilov2019adamw} chỉ áp dụng weight decay cho các tham số có ít nhất hai chiều.
+
+\begin{table}[htbp]
+  \centering\tablestyle
+  \caption{Cấu hình huấn luyện của hai giai đoạn tối ưu.}
+  \label{tab:config}
+  \begin{tabularx}{\linewidth}{>{\bfseries}l *{2}{>{\raggedright\arraybackslash}X}}
+    \toprule
+    Thiết lập & Chuyên gia theo tác vụ & FSFT (bộ định tuyến)\\
+    \midrule
+    Tham số huấn luyện được & Toàn bộ BERT và head (109.5M mỗi chuyên gia) & Chỉ bộ định tuyến (7.1M); 60 ở biến thể không phụ thuộc đầu vào\\
+    Bộ tối ưu & AdamW; weight decay 0.01 & AdamW; không weight decay\\
+    Learning rate & $2\times10^{-5}$ & $10^{-4}$; $10^{-3}$ ở biến thể không phụ thuộc đầu vào\\
+    Lịch học & Tuyến tính, warmup 10\% & Tuyến tính, warmup 10\%\\
+    Batch size, thời lượng & 32; 3 epoch & 16 mỗi tác vụ; 500 bước\\
+    Cắt gradient & Chuẩn 1.0 & Không\\
+    Lựa chọn trên dev & Epoch tốt nhất theo điểm tác vụ & Bước tốt nhất theo điểm trung bình, mỗi 50 bước\\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\section{Hợp nhất các chuyên gia và huấn luyện bộ định tuyến với dữ liệu few-shot}
+\label{sec:merging}
+
+Task Arithmetic chọn $\lambda$ từ $\{0.1,0.2,\dots,1.0\}$ theo điểm dev trung bình (Bảng~\ref{tab:lambda}). Điểm đạt đỉnh tại $\lambda=0.3$, và giá trị này khởi tạo các mô hình hợp nhất. Tập dev có thể gây hiểu nhầm với mô hình hợp nhất trên SST-2: tại $\lambda=0.3$, Task Arithmetic đạt 83.7 trên dev nhưng chỉ 69.8 trên tập kiểm định. Hai tập này khác nhau về bản chất, vì văn bản huấn luyện của SST-2 trung bình dài 9.4 từ còn văn bản kiểm định dài 19.5 từ. Chọn trên dev vẫn là quy trình đúng, nhưng điểm dev của SST-2 đánh giá cao hơn thực tế chất lượng của mô hình hợp nhất.
+
+\begin{table}[htbp]
+  \centering\tablestyle
+  \caption{Điểm dev của Task Arithmetic trên lưới $\lambda$ ($\times100$).}
+  \label{tab:lambda}
+  \begin{tabular}{l c c c c c c c c c c}
+    \toprule
+    $\lambda$ & 0.1 & 0.2 & \textbf{0.3} & 0.4 & 0.5 & 0.6 & 0.7 & 0.8 & 0.9 & 1.0\\
+    \midrule
+    Điểm dev trung bình & 52.0 & 57.4 & \textbf{62.8} & 60.7 & 58.6 & 58.0 & 57.5 & 57.3 & 57.4 & 57.1\\
+    Điểm dev SST-2 & 62.4 & 73.3 & \textbf{83.7} & 89.8 & 91.7 & 92.3 & 93.0 & 93.2 & 92.9 & 92.5\\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Mười lăm lần chạy FSFT đã được thực hiện, ba seed cho mỗi trong năm cấu hình. Mô hình chính là WEMoE \emph{full MLP} với $k\in\{16,64,256\}$. Hai \emph{ablation}, tức thí nghiệm thay đổi một thành phần và giữ nguyên phần còn lại, dùng $k=256$. Biến thể \emph{intermediate-only} chỉ nâng cấp fc1, còn fc2 dùng Task Arithmetic. Biến thể \emph{không phụ thuộc đầu vào} (input-independent) không có bộ định tuyến: nó học một hệ số cho mỗi chuyên gia ở mỗi lớp, giống nhau với mọi đầu vào, tổng cộng 60 số. Biến thể này xuất phát đúng tại Task Arithmetic và kiểm tra xem định tuyến theo đầu vào có cần thiết không. Learning rate của nó cao hơn vì có rất ít tham số.
+
+\section{Độ đo, baseline, seed và khả năng tái lập}
+\label{sec:metrics}
+
+\paragraph{Độ đo.} Điểm được nhân với 100. \emph{Điểm tác vụ} $S_t$ theo quy ước của GLUE: trung bình của độ chính xác (accuracy) và F1 với MRPC, hệ số tương quan Matthews (MCC)~\cite{matthews1975mcc} với CoLA, và độ chính xác với các tác vụ còn lại. MCC là mức tương quan giữa dự đoán và nhãn, và một dự đoán hằng đạt 0. \emph{Điểm trung bình} là trung bình không trọng số của năm điểm tác vụ, và \emph{điểm chuẩn hóa} là trung bình của $S_t(m)/S_t(\mathrm{expert})$ với mô hình $m$. Một dự đoán hằng đã đạt khoảng 75 trên MRPC và khoảng 50 trên các tác vụ dùng độ chính xác, nên điểm chuẩn hóa làm các mô hình yếu trông tốt hơn thực tế. \emph{Mức tăng so với lớp đa số} (gain over majority) khắc phục điều này, với 0 là dự đoán hằng và 100 là chuyên gia:
+\begin{equation}
+\mathrm{Gain}(m)=\frac{100}{T}\sum_{t=1}^{T}\frac{S_t(m)-S_t(\mathrm{majority})}{S_t(\mathrm{expert})-S_t(\mathrm{majority})}.
+\label{eq:gain}
+\end{equation}
+
+\paragraph{Baseline.} \emph{Lớp đa số} (majority class) luôn dự đoán nhãn phổ biến nhất trên tập kiểm định, đó là điểm của một mô hình đã sụp về dự đoán hằng. \emph{Simple Averaging} là Task Arithmetic với $\lambda=1/5$. \emph{Task Arithmetic} dùng giá trị đã chọn $\lambda=0.3$. \emph{WEMoE init} là mô hình hợp nhất trước khi huấn luyện bộ định tuyến. Năm chuyên gia là mốc trên.
+
+\paragraph{Seed và khả năng tái lập.} Cách chia dữ liệu và các chuyên gia dùng seed 42. FSFT dùng seed 0, 1 và 2, trong đó một seed quyết định khởi tạo bộ định tuyến và mẫu few-shot, còn các chuyên gia và cách chia dữ liệu được giữ cố định. Các lần chạy dùng Google Colab với một GPU NVIDIA Tesla T4 và mixed precision, với PyTorch 2.11.0, Datasets 4.8.5 và scikit-learn 1.6.1. Phiên bản Transformers~\cite{wolf2020transformers} được ghi lại là 5.20.2 cho các chuyên gia và phần lớn lần chạy FSFT, và 5.22.0 cho phần đánh giá baseline và các lần chạy không phụ thuộc đầu vào.

@@ -1,0 +1,33 @@
+% BERT encoder as traced from the code; same diagram as slide 6 of the presentation.
+\begin{tikzpicture}[x=1cm,y=1cm]
+  \tikzset{every node/.append style={font=\figfont}}
+  \node[plain] (x) at (.35,0) {Tokens $x$\\ \texttt{[CLS]} $A$ \texttt{[SEP]}\\ (+ $B$ \texttt{[SEP]})};
+  \node[frz,minimum width=2.35cm] (emb) at (3.65,0) {Embeddings\\ token + segment + position, LayerNorm};
+  \node[frz,minimum width=2.3cm,very thick] (enc) at (7.4,0) {\textbf{Encoder layer} $\ell$\\ repeated $\times 12$};
+  \node[frz,minimum width=1.75cm] (pool) at (9.85,0) {Pooler\\ {[CLS]}: dense, tanh};
+  \node[frz,minimum width=1.6cm] (head) at (12.0,0) {Head $g_t$\\ dropout, linear};
+  \node[plain] (out) at (13.55,0) {Logits\\ $\to\hat y$};
+  \foreach \a/\b in {x/emb,emb/enc,enc/pool,pool/head,head/out} \draw[flow] (\a) -- (\b);
+  \node[plain] (in) at (.55,-1.75) {$h$};
+  \node[frz,minimum width=1.9cm] (att) at (2.25,-1.75) {Multi-head\\ self-attention};
+  \node[frz,minimum width=.95cm] (an1) at (4.2,-1.75) {Add\\ \&Norm};
+  \node[mix,minimum width=1.2cm] (fc1) at (6.05,-1.75) {Linear fc1\\ $W_1,b_1$};
+  \node[frz,minimum width=.85cm] (act) at (7.5,-1.75) {GELU};
+  \node[mix,minimum width=1.2cm] (fc2) at (8.95,-1.75) {Linear fc2\\ $W_2,b_2$};
+  \node[frz,minimum width=.95cm] (an2) at (10.85,-1.75) {Add\\ \&Norm};
+  \node[plain] (outh) at (12.4,-1.75) {$h'$};
+  \foreach \a/\b in {in/att,att/an1,an1/fc1,fc1/act,act/fc2,fc2/an2,an2/outh} \draw[flow] (\a) -- (\b);
+  \coordinate (r1) at ($(in.east)!.45!(att.west)$);
+  \coordinate (r2) at ($(an1.east)!.45!(fc1.west)$);
+  \draw[flow] (r1) -- ++(0,.62) -| (an1.north);
+  \draw[flow] (r2) -- ++(0,.62) -| (an2.north);
+  \begin{scope}[on background layer]
+    \node[group,draw=BurntOrange,thick,fit=(fc1)(act)(fc2)] (mlp) {};
+    \coordinate (ltop) at ($(r1)+(0,.62)$);
+    \coordinate (lbot) at ($(mlp.south)+(0,-.32)$);
+    \node[group,inner sep=5pt,fit=(in)(outh)(att)(an2)(ltop)(lbot)] (lay) {};
+  \end{scope}
+  \draw[black!45,dotted,thick] (enc.south west) -- (lay.north west);
+  \draw[black!45,dotted,thick] (enc.south east) -- (lay.north east);
+  \node[font=\figfont\bfseries,text=BurntOrange!85!black,anchor=north] at (mlp.south) {MLP block: its linear layers are upscaled by WEMoE};
+\end{tikzpicture}

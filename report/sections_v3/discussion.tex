@@ -1,0 +1,50 @@
+\chapter{Trade-offs and Discussion}
+\label{ch:discussion}
+
+\section{What the Results Demonstrate}
+
+The measurements show three things in this setting. Static merging performs close to a constant prediction on the two smallest tasks. Routers trained on 256 examples per task raise the average score by 12.5 points and the gain over majority from 18.4 to 59.1. Fixed coefficients trained on the same data improve the average by only 1 point.
+
+Our interpretation is that input-dependent routing accounts for most of the improvement over Task Arithmetic. This goes beyond the direct measurement, because the two variants also differ in capacity (7.1M against 60 parameters) and in learning rate, and only one learning rate was tried for the ablation, although its best dev score moved by just 0.2.
+
+\section{Accuracy, Parameter/Storage and Latency Trade-offs}
+
+Full-MLP and intermediate-only WEMoE reach similar averages (69.9 and 69.1), but they fail on different tasks. Intermediate-only stores 47.2\% of the parameters of five models, is 35\% smaller than the full variant, trains in about half the time (8.4 against 16.3 minutes per run) and is faster at inference. Full-MLP has the higher gain (59.1 against 54.8), although the 0.8-point gap in the average is within sampling noise.
+
+Fewer stored parameters do not imply faster inference. Both WEMoE variants store less than five experts, yet they are slower per example, because every example gets its own merged weights and cannot share one matrix multiplication across a batch. Task Arithmetic is the smallest (20\%) and matches the speed of one BERT, but it scores 12.5 points below full-MLP WEMoE.
+
+\section{Practical Implications}
+
+Each input in this setup arrives with its task identifier, so the five experts could be selected directly by task. They are more accurate than full-MLP WEMoE on every task, faster per example, and only about 37\% larger. When the identifier is known and storage allows it, the experts remain the better choice in this experiment. WEMoE is worth considering mainly when storage must be reduced, and that case is strongest for the intermediate-only variant. Settings without an explicit task identifier may favour it further, but the merged model here still uses the identifier to select the head, and such settings were not evaluated. Averages should also not be read alone, since they conceal task-level failures that the majority-class floor exposes.
+
+\section{Limitations, Threats to Validity and Unresolved Questions}
+
+\begin{itemize}
+  \item \textbf{Internal validity.} ``Few-shot'' is not strict in the sense of Perez et al.~\cite{perez2021truefewshot}, because labels used for selection also count: at $k=256$, FSFT trains on 1,280 labelled examples in total, while selection uses 3,471 dev examples. SST-2 dev scores also overstate merged-model quality (Section~\ref{sec:merging}).
+  \item \textbf{Statistical validity.} Standard deviations cover three FSFT seeds and exclude variation in the experts and the data split, which use one seed. RTE and MRPC have small validation sets, with standard errors of about 3 and 2 points, larger than several differences discussed here, including 52.0 against 52.7 on RTE.
+  \item \textbf{External validity.} The results come from one full run on five binary tasks with one backbone, and they should not be generalised beyond this setup. Backbone, tasks, objective and data all differ from those of Tang et al.~\cite{tang2024wemoe}, so any comparison with that study is qualitative.
+  \item \textbf{Construct validity.} The average score mixes accuracy, F1 and MCC. Latency uses random inputs on one GPU, and batch-1 figures varied between runs. Routing statistics show association only, and some of them vary across seeds.
+\end{itemize}
+
+Unresolved questions include why RTE fails under full-MLP upscaling, what the routing variation within a task follows, and how far the score rises beyond $k=256$.
+
+\section{Demonstrated Findings and Open Hypotheses}
+
+Table~\ref{tab:findings} separates what the measurements establish in this setting from what remains to be tested.
+
+\begin{table}[htbp]
+  \centering\tablestyle
+  \caption{Demonstrated findings and open hypotheses.}
+  \label{tab:findings}
+  \begin{tabularx}{\linewidth}{*{2}{>{\raggedright\arraybackslash}X}}
+    \toprule
+    Demonstrated in this setting & Open hypothesis\\
+    \midrule
+    FSFT with routers improves clearly on Task Arithmetic on average. & Input dependence, rather than capacity, explains most of this improvement.\\
+    Fixed coefficients with the tested settings barely improve on it. & A different learning rate would not change this outcome.\\
+    Small budgets are unstable; the average still rises at $k=256$. & Larger budgets would keep raising the score.\\
+    The two scopes are weak on different tasks. & The RTE failure comes from trade-offs in the summed objective and mean-score selection, or from a weak RTE expert.\\
+    Intermediate-only reaches its best step late (400--500 of 500). & More steps would improve the intermediate-only model.\\
+    \bottomrule
+  \end{tabularx}
+\end{table}

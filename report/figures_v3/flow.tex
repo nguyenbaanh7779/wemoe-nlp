@@ -1,0 +1,35 @@
+% Four-stage flow of the Version 3 presentation (slide 11); theta_0 also feeds the merge, as in the code.
+\begin{tikzpicture}[x=1cm,y=1cm]
+  \fill[NavyBlue!4,rounded corners=3pt] (-.3,-2.65) rectangle (2.75,2.5);
+  \fill[NavyBlue!4,rounded corners=3pt] (3.1,-2.65) rectangle (6.2,2.5);
+  \fill[Goldenrod!12,rounded corners=3pt] (6.55,-2.65) rectangle (10.1,2.5);
+  \fill[NavyBlue!4,rounded corners=3pt] (10.45,-2.65) rectangle (13.75,2.5);
+  \node[font=\figfont\bfseries,text=BrickRed] at (1.22,2.25) {1. Dataset};
+  \node[font=\figfont\bfseries,text=BrickRed] at (4.65,2.25) {2. Fine-tune};
+  \node[font=\figfont\bfseries,text=BrickRed] at (8.33,2.25) {3. Train WEMoE};
+  \node[font=\figfont\bfseries,text=BrickRed] at (12.1,2.25) {4. Evaluate};
+  \node[dat,fill=white,minimum width=2.75cm,font=\figfont] (d) at (1.22,1.45) {\textbf{5 GLUE tasks}\\ MRPC, RTE, CoLA,\\ SST-2, QNLI};
+  \node[dat,fill=white,minimum width=2.2cm,minimum height=.5cm,font=\figfont] (tr) at (1.5,.6) {Expert train};
+  \node[dat,fill=white,minimum width=2.2cm,minimum height=.5cm,font=\figfont] (dv) at (1.5,-.35) {Dev};
+  \node[dat,fill=white,minimum width=2.2cm,minimum height=.5cm,font=\figfont] (fs) at (1.5,-1.25) {Few-shot pool};
+  \node[dat,fill=white,minimum width=2.2cm,minimum height=.5cm,font=\figfont] (va) at (1.5,-2.15) {Official validation};
+  \draw[thick,black!80] (.05,1.45 |- d.south) -- (.05,-2.15);
+  \foreach \n in {tr,dv,fs,va}{\draw[flow] (.05,0 |- \n.west) -- (\n.west);}
+  \node[frz,minimum width=2.7cm,font=\figfont] (p) at (4.65,1.62) {\textbf{Pretrained} $\theta_0$\\ \texttt{bert-base-uncased}};
+  \node[frz,minimum width=2.7cm,minimum height=.9cm,font=\figfont] (e) at (4.65,.6) {\textbf{Five experts} $\theta_i$, heads $g_i$\\ $\tau_i=\theta_i-\theta_0$};
+  \draw[flow] (p) -- (e);
+  \draw[flow] (tr.east) -- (e.west |- tr.east);
+  \node[mix,minimum width=3.1cm,minimum height=1cm,font=\figfont] (m) at (8.33,.6) {\textbf{Merge}\\ Outside MLP: Task Arithmetic\\ MLP: WEMoE modules};
+  \node[trn,minimum width=3.1cm,minimum height=.9cm,font=\figfont] (f) at (8.33,-1.25) {\textbf{FSFT: routers only}\\ $k$ examples per task\\ $\to$ one merged model};
+  \draw[dict] (e.east) -- (m.west);
+  \draw[dict] (p.east) -| node[pos=.3,above,font=\figfont,text=NavyBlue]{$\theta_0$} (m.north);
+  \draw[flow] (9.3,0 |- m.south) -- (9.3,0 |- f.north);
+  \draw[flow] (fs.east) -- (f.west);
+  \draw[dict,dashed,-] (dv.east) -- (7.2,-.35);
+  \draw[dict,dashed] (4.65,-.35) -- node[right,font=\figfont,text=NavyBlue]{best epoch} (e.south);
+  \draw[dict,dashed] (7.2,-.35) -- node[left,font=\figfont,text=NavyBlue]{$\lambda$} (7.2,0 |- m.south);
+  \draw[dict,dashed] (7.2,-.35) -- node[right,font=\figfont,text=NavyBlue]{best step} (7.2,0 |- f.north);
+  \node[frz,minimum width=3cm,minimum height=4.5cm,text width=2.8cm,align=left,font=\figfont] (b) at (12.1,-.25) {\textbf{Reported on official validation only}\\[2mm] \textbf{Scores:} task score, average, gain over majority\\[2mm] \textbf{Compared with:} experts, Task Arithmetic, majority class\\[2mm] \textbf{Costs:} stored parameters, latency};
+  \draw[flow] (f.east) -- (b.west |- f.east);
+  \draw[flow] (va.east) -- (b.west |- va.east);
+\end{tikzpicture}

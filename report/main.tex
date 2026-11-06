@@ -1,0 +1,42 @@
+% WEMoE-NLP research report. Build: latexmk -pdf main.tex (pdfLaTeX + BibTeX, as required by the theme).
+\input{theme_preamble}
+
+% Additions to the theme: natbib is required by the theme's plainnat bibliography style.
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{url}
+\input{figures/styles}
+\pgfplotsset{compat=1.18}
+\graphicspath{{figures/}}
+% The vietnam package switches the document labels to Vietnamese; this report is in English.
+\AtBeginDocument{\renewcommand{\chaptername}{Chapter}\renewcommand{\figurename}{Figure}\renewcommand{\tablename}{Table}\renewcommand{\bibname}{References}}
+\newcommand{\tablestyle}{\footnotesize\def\baselinestretch{1.05}\selectfont\renewcommand{\arraystretch}{1.12}\setlength{\tabcolsep}{4.5pt}\setlength{\belowcaptionskip}{4pt}}
+\newcommand{\code}[1]{\texttt{\small #1}}
+\hypersetup{pdftitle={Merging BERT Experts with Weight-Ensembling Mixture of Experts},
+  pdfauthor={Nguyen Ba Anh; Nguyen Thi Nha Linh},colorlinks=true,linkcolor=NavyBlue,citecolor=NavyBlue,urlcolor=NavyBlue}
+\setlength{\headheight}{15pt}
+\setlength{\emergencystretch}{1.5em}
+\hyphenation{WEMoE GLUE BERT}
+
+\begin{document}
+\input{sections/cover}
+
+\newpage
+\pagenumbering{arabic}
+\renewcommand{\contentsname}{\color{NavyBlue}{CONTENTS}}
+{\def\baselinestretch{1.0}\selectfont\tableofcontents}
+
+\input{sections/abstract}
+\input{sections/introduction}
+\input{sections/background}
+\input{sections/methodology}
+\input{sections/experiments}
+\input{sections/results}
+\input{sections/conclusion}
+
+\cleardoublepage
+\phantomsection
+\addcontentsline{toc}{chapter}{References}
+{\small\def\baselinestretch{1.0}\selectfont\setlength{\bibsep}{2pt}
+\bibliographystyle{plainnat}
+\bibliography{references}}
+\end{document}

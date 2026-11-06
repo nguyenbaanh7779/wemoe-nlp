@@ -1,0 +1,123 @@
+\chapter{Proposed Methodology}
+
+This chapter describes the method as implemented. Differences from the original WEMoE study are collected in Table~\ref{tab:comparison} at the end of the chapter. Throughout, $E=5$ denotes the number of experts, $e$ indexes experts, $t$ is the task of an input, and $\ell\in\{1,\dots,12\}$ indexes encoder layers.
+
+\section{Overall Architecture}
+
+Figure~\ref{fig:architecture} shows the merged model. An input passes through one BERT encoder. Outside the MLP blocks, all parameters (embeddings, attention, layer normalisation and pooler) are static and merged by Task Arithmetic. In each encoder layer, a router reads the token states leaving the attention block and emits gating weights that determine the MLP parameters used for that input. The task identifier selects a frozen head at the end. The experts themselves are never executed at inference: they contribute only task vectors and heads when the model is built.
+
+\begin{figure}[htbp]
+  \centering
+  \resizebox{\linewidth}{!}{\input{figures/architecture}}\\[2pt]
+  \figlegend
+  \caption{Merged WEMoE model as implemented. In the full scope both fc1 (\code{intermediate.dense}) and fc2 (\code{output.dense}) are input-conditioned. In the intermediate-only scope fc2 is static and uses Task Arithmetic. Only the routers are trainable.}
+  \label{fig:architecture}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=.7\linewidth]{wemoe_paper.png}
+  \caption{Original WEMoE design on a pre-norm Vision Transformer, reproduced from Tang et al.~\cite{tang2024wemoe} for comparison. The implementation in Figure~\ref{fig:architecture} applies the same principle to post-norm BERT layers.}
+  \label{fig:wemoe-paper}
+\end{figure}
+
+\section{Task-specific BERT Experts}
+
+Each expert results from standard task-specific fine-tuning of \texttt{bert-base-uncased} (Figure~\ref{fig:experts}). A sequence classifier with a new two-class head is trained on the expert-training portion of its task, updating all layers, and the best of three epochs is selected on the development split. The output is a pair $(\theta_e,g_e)$, where $g_e$ is a dropout-plus-linear head producing two logits. The displacements $\tau_e$ form the dictionary of task knowledge, and the heads provide the task-specific outputs of the merged model.
+
+\begin{figure}[htbp]
+  \centering
+  \resizebox{.9\linewidth}{!}{\input{figures/experts}}
+  \caption{Expert preparation. Each expert is fine-tuned independently from the shared pre-trained model, then reduced to a task vector and a classification head.}
+  \label{fig:experts}
+\end{figure}
+
+\section{Router Architecture}
+
+Each encoder layer has its own router $r^{\ell}$, shown in Figure~\ref{fig:router}. Its input is the sequence of token states $h^{\ell}_i\in\mathbb{R}^{768}$ produced by the layer's attention block after Add\&Norm. The router is a two-layer MLP applied to every token:
+\begin{equation}
+r^{\ell}(h)=A^{\ell}_2\,\mathrm{ReLU}\big(A^{\ell}_1h+c^{\ell}_1\big)+c^{\ell}_2,
+\label{eq:router}
+\end{equation}
+with $A^{\ell}_1\in\mathbb{R}^{768\times768}$ and $A^{\ell}_2\in\mathbb{R}^{5\times768}$. Token outputs are averaged over non-padding positions using the attention mask $m_i\in\{0,1\}$ to obtain one vector of gating weights per input:
+\begin{equation}
+w^{\ell}(x)=\frac{\sum_i m_i\,r^{\ell}(h^{\ell}_i)}{\sum_i m_i}\in\mathbb{R}^{5}.
+\label{eq:gating}
+\end{equation}
+The gating weights are \emph{unnormalised}: with no softmax and no top-$k$ selection, a router may amplify a task vector ($w_e>1$) or subtract it ($w_e<0$), so the combination is neither convex nor sparse. Router weights are initialised from $\mathcal{N}(0,0.01^2)$, with $c^{\ell}_1=0$ and $c^{\ell}_2=\lambda$, which makes $w^{\ell}_e(x)\approx\lambda$, so the model begins close to Task Arithmetic. The twelve routers hold 7,133,244 trainable parameters in total.
+
+\begin{figure}[htbp]
+  \centering
+  \resizebox{.8\linewidth}{!}{\input{figures/router}}
+  \caption{Router of layer $\ell$. The MLP is applied per token and its outputs are averaged over non-padding tokens.}
+  \label{fig:router}
+\end{figure}
+
+\section{Weight-Ensembling Mechanism}
+
+Let $W^{\ell}_{m,0}$ and $b^{\ell}_{m,0}$ be the pre-trained weight and bias of MLP module $m\in\{1,2\}$ in layer $\ell$ (fc1 and fc2), and let $\tau^{\ell}_{e,m}$ and $\tau^{\ell,b}_{e,m}$ be the corresponding parts of the task vector of expert $e$. For an input $x$, the parameters actually applied are
+\begin{equation}
+W^{\ell}_m(x)=W^{\ell}_{m,0}+\sum_{e=1}^{E}w^{\ell}_e(x)\,\tau^{\ell}_{e,m},\qquad
+b^{\ell}_m(x)=b^{\ell}_{m,0}+\sum_{e=1}^{E}w^{\ell}_e(x)\,\tau^{\ell,b}_{e,m}.
+\label{eq:we}
+\end{equation}
+The MLP of Equation~\eqref{eq:ffn} then becomes input-conditioned, with the same gating vector shared by fc1 and fc2:
+\begin{equation}
+\mathrm{FFN}^{\ell}(h_i;x)=W^{\ell}_2(x)\,\mathrm{GELU}\big(W^{\ell}_1(x)\,h_i+b^{\ell}_1(x)\big)+b^{\ell}_2(x).
+\label{eq:we-ffn}
+\end{equation}
+Parameters outside the upscaled modules, collected as $\bar\theta$, are fixed by Equation~\eqref{eq:ta} at the selected $\lambda$. The intermediate-only scope conditions fc1 alone, and its fc2 also belongs to $\bar\theta$.
+
+\begin{figure}[htbp]
+  \centering
+  \resizebox{\linewidth}{!}{\input{figures/weight_ensembling}}
+  \caption{Parameter-level combination used by the implementation (a), contrasted with output-level combination (b). The latter is shown only for reference and is not part of this project.}
+  \label{fig:we}
+\end{figure}
+
+Figure~\ref{fig:we} shows the distinction that matters here. The code performs parameter-level combination only: no expert logits are computed and nothing is averaged at the output. The final prediction is
+\begin{equation}
+p(y\mid x,t)=\mathrm{softmax}\Big(g_t\big(\mathrm{pool}(\mathrm{BERT}(x;\bar\theta,\{W^{\ell}(x)\}))\big)\Big),\qquad
+\hat y=\arg\max_{y}\,p(y\mid x,t),
+\label{eq:prediction}
+\end{equation}
+where $g_t$ is the head of the known input task. In the code, \code{WeightEnsembledLinear} stores $W_0$ and the stacked task vectors as non-trainable buffers. The default \code{merged} mode builds per-sample weight tensors and applies a batched matrix product; \code{decomposed} and \code{loop} modes compute the same result for memory-constrained training and for tests. Unit tests confirm that the modes agree, that constant routing reduces to Task Arithmetic and that padding does not affect routing.
+
+\section{Training and Inference Pipeline}
+
+Figure~\ref{fig:workflow} summarises the workflow. Training-time operations consist of three optimisation or selection problems. First, each expert minimises the cross-entropy on its own training data $\mathcal{D}_e$:
+\begin{equation}
+\min_{\theta_e,\,g_e}\ -\frac{1}{|\mathcal{D}_e|}\sum_{(x,y)\in\mathcal{D}_e}\log p_e(y\mid x).
+\label{eq:expert-loss}
+\end{equation}
+Next, the scaling factor of Equation~\eqref{eq:ta} is chosen by grid search on the development split, and the WEMoE model is built from it. Finally, FSFT trains the router parameters $\phi$ of Equation~\eqref{eq:router} in all twelve layers while every other parameter remains frozen. At each step one mini-batch $B_t$ is drawn from the $k$ labelled examples of each task, and the summed cross-entropy is minimised:
+\begin{equation}
+\min_{\phi}\ \mathcal{L}_{\mathrm{FSFT}}(\phi)=\sum_{t=1}^{E}\ -\frac{1}{|B_t|}\sum_{(x,y)\in B_t}\log p_{\phi}(y\mid x,t).
+\label{eq:fsft}
+\end{equation}
+Backbone dropout is disabled during this stage. The mean development score is evaluated at initialisation and every 50 steps, and the router state of the best step is restored at the end. The original paper instead minimises prediction entropy on unlabelled test data~\cite{tang2024wemoe}; this objective is not implemented in this project.
+
+\begin{figure}[htbp]
+  \centering
+  \resizebox{\linewidth}{!}{\input{figures/workflow}}
+  \caption{Training workflow (top) and inference workflow (bottom). Merging and training happen once; routing and weight construction happen for each input in each layer.}
+  \label{fig:workflow}
+\end{figure}
+
+Inference involves no optimisation. In each layer the model attends, computes $w^{\ell}(x)$ from Equation~\eqref{eq:gating}, constructs the parameters of Equation~\eqref{eq:we} and applies Equation~\eqref{eq:we-ffn}, and it finally evaluates Equation~\eqref{eq:prediction}. A checkpoint holds only \code{router.pt} and a configuration file, so \code{load\_trained\_wemoe} rebuilds the model from the experts and the saved router weights.
+
+\begin{table}[htbp]
+  \centering\tablestyle
+  \caption{The original WEMoE study of Tang et al.~\cite{tang2024wemoe} and this project.}
+  \label{tab:comparison}
+  \begin{tabularx}{\linewidth}{>{\bfseries\raggedright\arraybackslash}p{2.9cm} *{2}{>{\raggedright\arraybackslash}X}}
+    \toprule
+    Aspect & Tang et al. & This project\\
+    \midrule
+    Backbone, tasks & CLIP vision models, image classification & BERT-base, five GLUE tasks\\
+    Upscaled modules & Transformer MLPs & Full MLP (default); intermediate-only as an ablation\\
+    Routing input & Mean over tokens & Masked mean over non-padding tokens (default)\\
+    Router training & Test-time adaptation (entropy on unlabelled test data) & FSFT (cross-entropy on labelled examples)\\
+    \bottomrule
+  \end{tabularx}
+\end{table}

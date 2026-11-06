@@ -1,0 +1,48 @@
+\chapter{The Problem}
+\label{ch:problem}
+
+\section{Why One Separate Model per Task Does Not Scale}
+
+Pre-trained language models have changed how natural language processing systems are built. An encoder such as BERT~\cite{devlin2019bert} can be fine-tuned for a new classification problem with limited data, so a system that supports several language understanding tasks tends to collect one fine-tuned copy of the same architecture per task. Each copy performs well on its own task, yet the collection becomes costly in four ways.
+
+\begin{itemize}
+  \item \textbf{Storage.} Every copy holds a complete parameter set, although all copies start from the same pre-trained weights.
+  \item \textbf{Training.} Every new task requires another full fine-tuning run, with its own data, compute and model selection.
+  \item \textbf{Serving.} A deployment must version, load and route requests to a separate model for each task.
+  \item \textbf{Knowledge isolation.} Each model knows only its own task. Whatever it learned during fine-tuning is not available to the others.
+\end{itemize}
+
+\section{Problem Statement and Research Questions}
+\label{sec:problem}
+
+Let $\theta_0$ be the weights of a pre-trained model, and let $\theta_i$, $i\in\mathcal{T}$, be the weights of models fine-tuned from it for a set $\mathcal{T}$ of $T$ tasks. We call each fine-tuned model an \emph{expert}. The \emph{task vector} of task $i$ is the change that fine-tuning made to the shared starting point:
+\begin{equation}
+\tau_i=\theta_i-\theta_0 .
+\label{eq:task-vector}
+\end{equation}
+The input of the problem is $\theta_0$ with the weights $\theta_i$, or equivalently with the task vectors. The output is one multi-task model with weights $\theta_{\mathrm{mer}}=C(\theta_0,\theta_i)$, which maps a text and its task to a label. The problem is to find a merge function $C$ such that the merged model meets three objectives:
+
+\begin{enumerate}
+  \item[\textbf{O1.}] It integrates task knowledge \emph{dynamically}, depending on the input.
+  \item[\textbf{O2.}] It stays close to the quality of the task-specific models.
+  \item[\textbf{O3.}] It needs fewer stored parameters than keeping all the models.
+\end{enumerate}
+
+No pass threshold was fixed in advance, so ``close'' is reported as a measured distance and not as a binary outcome. This study addresses four research questions:
+
+\begin{enumerate}
+  \item[\textbf{RQ1.}] How much of the performance lost by static merging can routers recover when they are trained on labelled examples that the experts never saw?
+  \item[\textbf{RQ2.}] How does that recovery depend on the labelled budget?
+  \item[\textbf{RQ3.}] Does the improvement require routing that depends on the input, or would better fixed coefficients be enough?
+  \item[\textbf{RQ4.}] How does the choice of upscaled MLP layers affect per-task behaviour and storage, and what does the method cost at inference?
+\end{enumerate}
+
+\section{Why the Problem Matters and Why It Is Difficult}
+
+\emph{Model consolidation}, the merging of already fine-tuned models into one, matters because many systems serve related language tasks and a shared model makes knowledge reusable across them. Multi-task learning~\cite{caruana1997multitask} also produces one model, but it trains jointly on all the data and repeats that cost when a task is added. Consolidation starts from models that already exist, so it needs no joint retraining from scratch.
+
+The difficulty lies in how fine-tuned models disagree. Updates that help one task can harm another when they land on the same parameters, which is known as \emph{task interference}. Two models can also pull one weight in opposite directions, so that a sum partly cancels what each of them learned. Any merge must therefore decide how much of each update to keep, and it must do so without the original training data of every task.
+
+\section{Why Static Merging Alone May Be Insufficient}
+
+A static method such as Task Arithmetic~\cite{ilharco2023task} combines parameters once and commits to one set of weights for all inputs. The five tasks in this study make the limitation concrete. They differ in what they ask of the encoder: judging one sentence for grammar or sentiment, or relating two sentences through paraphrase, entailment or question answering. A single parameter vector must serve all of these at once, and its scaling factor can only trade them against one another. As Tang et al.~\cite{tang2024wemoe} argue, the best solution can vary with the input, so one fixed result is unlikely to be the best for every task. The gap this report examines is therefore whether merged weights should change with the input instead of staying fixed.

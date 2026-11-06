@@ -1,0 +1,80 @@
+\chapter{Background and Related Work}
+
+\section{Transformer Architecture}
+
+\begin{figure}[t]
+  \centering
+  \begin{minipage}[b]{.3\linewidth}
+    \centering
+    \includegraphics[width=.8\linewidth]{transformer_paper.png}
+    \caption{Transformer, from~\cite{vaswani2017attention}.}
+    \label{fig:transformer}
+  \end{minipage}\hfill
+  \begin{minipage}[b]{.56\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{bert_paper.png}
+    \caption{BERT: bidirectional encoder stack (left) and pre-training with Masked LM and NSP (right). Adapted from Devlin et al.~\cite{devlin2019bert}.}
+    \label{fig:bert}
+  \end{minipage}
+\end{figure}
+
+The Transformer~\cite{vaswani2017attention}, shown in Figure~\ref{fig:transformer}, replaces recurrence with attention. Its central operation, scaled dot-product attention, relates queries $Q$ to keys $K$ of dimension $d_k$ and values $V$:
+\begin{equation}
+\mathrm{Attention}(Q,K,V)=\mathrm{softmax}\!\left(\frac{QK^{\top}}{\sqrt{d_k}}\right)V .
+\label{eq:attention}
+\end{equation}
+The factor $\sqrt{d_k}$ prevents large dot products from pushing the softmax into regions with small gradients. Multi-head attention applies $h$ learned projections in parallel:
+\begin{equation}
+\mathrm{MultiHead}(Q,K,V)=\mathrm{Concat}(\mathrm{head}_1,\dots,\mathrm{head}_h)W^{O},\quad
+\mathrm{head}_i=\mathrm{Att}(QW_i^{Q},KW_i^{K},VW_i^{V}),
+\label{eq:multihead}
+\end{equation}
+where $\mathrm{Att}$ is Equation~\eqref{eq:attention} and $W_i^{Q},W_i^{K},W_i^{V},W^{O}$ are learned projections.
+
+Attention is insensitive to token order, so order information is added to the input: fixed sinusoidal encodings in the original Transformer and learned position embeddings in BERT. Each layer also contains a position-wise feed-forward network, referred to in this report as the MLP block:
+\begin{equation}
+\mathrm{FFN}(h)=W_2\,\sigma(W_1h+b_1)+b_2 ,
+\label{eq:ffn}
+\end{equation}
+where $h$ is a token representation, $\sigma$ a non-linearity, and $(W_1,b_1)$, $(W_2,b_2)$ the parameters of two linear layers. Every sub-layer is wrapped by a residual connection followed by layer normalisation~\cite{ba2016layernorm}, $h'=\mathrm{LayerNorm}\big(h+\mathrm{Sublayer}(h)\big)$. This post-norm arrangement, used by BERT, differs from the pre-norm layers of the CLIP vision models of Tang et al.~\cite{tang2024wemoe}, which affects where a router reads its input.
+
+\section{BERT}
+
+BERT~\cite{devlin2019bert} is an encoder-only Transformer that conditions each token representation on both its left and right context. A sequence pair is encoded as \texttt{[CLS]} $A$ \texttt{[SEP]} $B$ \texttt{[SEP]}, and each input position receives the sum of three learned embeddings,
+\begin{equation}
+E_i=E^{\mathrm{token}}(x_i)+E^{\mathrm{segment}}(s_i)+E^{\mathrm{position}}(i),
+\label{eq:bert-input}
+\end{equation}
+where $x_i$ is the token and $s_i\in\{A,B\}$ its segment. Pre-training combines two self-supervised objectives (Figure~\ref{fig:bert}). Masked Language Modelling predicts the original identity of masked input tokens, and Next Sentence Prediction decides whether sentence $B$ follows sentence $A$ in the corpus.
+
+The \texttt{bert-base-uncased} configuration used here has 12 layers, hidden size 768, 12 attention heads, MLP size 3072 and the GELU non-linearity~\cite{hendrycks2016gelu}. For downstream classification, the pre-training heads are replaced by a new head on the pooled representation: the final \texttt{[CLS]} state passes through a dense layer with $\tanh$ activation, then dropout and a linear classifier. Because every expert in this project starts from the same pre-trained weights, the experts share one parameterisation, which makes weight-level merging meaningful.
+
+\section{Mixture of Experts}
+
+Mixture of Experts (MoE) models~\cite{jacobs1991adaptive,mu2025survey} solve a problem through several specialised expert networks and a gating network, or router, that decides how much each expert contributes to a given input:
+\begin{equation}
+\mathrm{MoE}(x)=\sum_{i=1}^{n}G_i(x)\,E_i(x),
+\label{eq:moe}
+\end{equation}
+where $E_i$ is an expert and $G_i(x)$ its gate value. Classically, experts are trained jointly with a gate that produces a distribution, and Shazeer et al.~\cite{shazeer2017moe} scale the idea by making the gate sparse. Equation~\eqref{eq:moe} combines expert \emph{outputs}; as Section~\ref{sec:we-background} explains, WEMoE keeps the router but changes what is combined.
+
+\section{Weight Ensembling}
+\label{sec:we-background}
+
+Let $\theta_0$ denote the pre-trained parameters and $\theta_e$ the parameters of expert $e$ after task-specific fine-tuning. The task vector of expert $e$ is its displacement from the shared starting point~\cite{ilharco2023task}:
+\begin{equation}
+\tau_e=\theta_e-\theta_0 .
+\label{eq:task-vector}
+\end{equation}
+Task Arithmetic then merges $E$ experts with one global scaling factor $\lambda$:
+\begin{equation}
+\theta_{\mathrm{TA}}=\theta_0+\lambda\sum_{e=1}^{E}\tau_e .
+\label{eq:ta}
+\end{equation}
+Simple Averaging is the special case $\lambda=1/E$. These merges are cheap, but updates from different tasks may interfere and one parameter vector must serve all inputs. WEMoE~\cite{tang2024wemoe} instead treats task vectors as a dictionary and reconstructs selected parameters for each input, restricting this to MLP blocks because fine-tuning changes them most.
+
+Weight ensembling must be distinguished from output or logit ensembling. A logit ensemble runs every model and combines predictions, so its cost grows with the number of experts and it requires a shared output space. A weight ensemble combines parameters before they are applied, so one forward pass suffices. The two are not equivalent: for one linear layer $(\sum_e w_e W_e)h=\sum_e w_e(W_eh)$, but this equality is lost across non-linear activations and stacked layers. The price is that task vectors must remain stored and per-input weights must be assembled at run time.
+
+\section{GLUE Benchmark}
+
+The General Language Understanding Evaluation benchmark~\cite{wang2019glue} collects language understanding tasks under common splits and metrics. This project uses five binary tasks: MRPC decides whether two sentences are paraphrases~\cite{dolan2005mrpc}; RTE decides whether a premise entails a hypothesis~\cite{dagan2006rte}; CoLA judges the grammatical acceptability of a sentence~\cite{warstadt2019cola}; SST-2 classifies the sentiment of movie-review sentences and phrases~\cite{socher2013sst}; and QNLI, derived from SQuAD~\cite{rajpurkar2016squad}, decides whether a sentence contains the answer to a question.
