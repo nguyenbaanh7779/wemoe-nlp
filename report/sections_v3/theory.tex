@@ -1,0 +1,143 @@
+\chapter{Theory and Method: WEMoE}
+\label{ch:theory}
+
+Throughout this chapter, $T=5$ is the number of tasks and experts, $i$ indexes experts, $t$ is the task of an input, $\ell\in\{1,\dots,12\}$ indexes encoder layers, and $j$ indexes the $N$ tokens of an input. The method is described as implemented in this study.
+
+\section{BERT Encoder and Shared Backbone}
+
+BERT~\cite{devlin2019bert} is an encoder-only Transformer~\cite{vaswani2017attention}. This study uses \texttt{bert-base-uncased}, with 12 encoder layers, hidden size $d=768$, 12 attention heads and an MLP size of 3072, for 109.5M parameters per expert including the head. Figure~\ref{fig:bert} shows the structure. Tokens are mapped to the sum of a token, a segment and a position embedding, followed by layer normalisation~\cite{ba2016layernorm}. Each encoder layer then has two sub-layers. Self-attention gives each token a state that reflects its whole context, relating queries $Q$ to keys $K$ of dimension $d_k$ and values $V$:
+\begin{equation}
+\mathrm{Attention}(Q,K,V)=\mathrm{softmax}\!\left(\frac{QK^{\top}}{\sqrt{d_k}}\right)V .
+\label{eq:attention}
+\end{equation}
+The second sub-layer is a position-wise feed-forward network, called the \emph{MLP block} here:
+\begin{equation}
+\mathrm{MLP}(h)=W_2\,\mathrm{GELU}(W_1h+b_1)+b_2 ,
+\label{eq:ffn}
+\end{equation}
+where $h$ is a token state, GELU is the activation of Hendrycks and Gimpel~\cite{hendrycks2016gelu}, and $(W_1,b_1)$ and $(W_2,b_2)$ are the first and second linear layers of the block, called fc1 and fc2. Each sub-layer is wrapped as $h'=\mathrm{LayerNorm}\big(h+\mathrm{Sublayer}(h)\big)$. For classification, the final \texttt{[CLS]} state passes through the pooler, a dense layer with $\tanh$, and then a task-specific head $g_t$ made of dropout and a linear layer with two outputs. All experts start from the same weights and share this structure, so their weights can be subtracted and added position by position.
+
+\begin{figure}[htbp]
+  \centering
+  \resizebox{.82\linewidth}{!}{\input{figures_v3/bert}}
+  \caption{BERT encoder as used in this study, from the input tokens to the logits (top), with one encoder layer enlarged (bottom). Dropout layers are not drawn.}
+  \label{fig:bert}
+\end{figure}
+
+\section[WEMoE Architecture: Static and Input-Conditioned Merging]{WEMoE Architecture: Static and\\ Input-Conditioned Merging}
+
+WEMoE splits the parameters into two groups. In the design of Tang et al.~\cite{tang2024wemoe}, shown in Figure~\ref{fig:overview}, attention and layer normalisation are merged statically, and each MLP is ``upscaled'' to a Weight-Ensembling MoE module, meaning that its weights become input-conditioned. Their vision Transformers normalise before each sub-layer. BERT normalises after it, so Figure~\ref{fig:arch} shows the same principle as implemented on BERT. Here the static group is every weight of the encoder outside the upscaled layers, including embeddings and pooler. Table~\ref{tab:components} lists the components, where $W_0^{\ell}$ and $\tau_i^{\ell}$ are the parts of $\theta_0$ and $\tau_i$ that belong to the MLP of layer $\ell$, $\lambda$ is the scaling factor of Section~\ref{sec:ta} and $r^{\ell}$ is the router of Section~\ref{sec:router}. The router sees only token states and does not receive the task identifier, which selects the head alone.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=.38\linewidth]{arch_wemoe_overview.png}
+  \caption{Original WEMoE design on a pre-norm vision Transformer, from Tang et al.~\cite{tang2024wemoe}. Top: the fine-tuned and pre-trained models. Bottom: the merged layer. Frozen parts carry a snowflake mark.}
+  \label{fig:overview}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \resizebox{.76\linewidth}{!}{\input{figures_v3/architecture}}\\[2pt]
+  \figlegend
+  \caption{Merged WEMoE model as implemented. In the full scope both fc1 and fc2 are input-conditioned. In the intermediate-only scope fc2 is static and uses Task Arithmetic.}
+  \label{fig:arch}
+\end{figure}
+
+\begin{table}[htbp]
+  \centering\tablestyle
+  \caption{Components of the merged model in the default full-MLP variant.}
+  \label{tab:components}
+  \begin{tabularx}{\linewidth}{l X c}
+    \toprule
+    Component & Origin & During FSFT\\
+    \midrule
+    Embeddings, attention, layer norm, pooler & Task Arithmetic with $\lambda$ chosen on dev & Frozen\\
+    MLP base weights $W_0^{\ell}$ & Pre-trained model & Frozen\\
+    MLP task vectors $\tau_i^{\ell}$ & Experts minus pre-trained model & Frozen\\
+    Classification heads $g_t$ & One from each expert & Frozen\\
+    Routers $r^{\ell}$ & New, one per encoder layer & \textbf{Trained}\\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+The split sets the storage cost. A static part is stored once. Each upscaled layer must keep its pre-trained weights and one task vector per expert, which is $T+1$ copies of that layer, and the routers add their own parameters $\phi$:
+\begin{equation}
+|\theta_{\mathrm{static}}|+(T+1)\,|\theta_{\mathrm{MLP}}|+|\phi|+|\mathrm{heads}|,
+\label{eq:storage}
+\end{equation}
+where $\theta_{\mathrm{MLP}}$ denotes the upscaled layers. We evaluate two scopes: \emph{full}, which upscales fc1 and fc2, and \emph{intermediate-only}, which upscales fc1 alone. The task vectors account for most of the stored parameters of the full scope (Table~\ref{tab:storage}), so the saving depends strongly on this choice. Tang et al.\ base the choice of the MLP on their observation for CLIP-ViT models that attention weights stay closer in direction to the pre-trained model than MLP weights do. We did not repeat that measurement on BERT, so the choice is inherited and not independently justified here.
+
+\section{Task Arithmetic and Task Vectors}
+\label{sec:ta}
+
+A task vector (Equation~\ref{eq:task-vector}) records what fine-tuning changed for a task. Task Arithmetic~\cite{ilharco2023task} adds the vectors back to the base with one scaling factor $\lambda$:
+\begin{equation}
+\theta=\theta_0+\lambda\sum_{i=1}^{T}\tau_i .
+\label{eq:ta}
+\end{equation}
+Simple Averaging is the special case $\lambda=1/T$, which equals the mean of the expert weights. A small $\lambda$ stays near the pre-trained model, and a large one applies the updates more strongly, including any conflicts among them. We select $\lambda$ by grid search on the mean development score (Section~\ref{sec:merging}). The method is simple and adds no parameters, but its result is the same for every input.
+
+\section{Router and Input-Conditioned MLP}
+\label{sec:router}
+
+Each encoder layer has its own router $r^{\ell}$ (Figure~\ref{fig:router}). Its input is the sequence of token states $h^{\ell}_j\in\mathbb{R}^{d}$ that leave the first Add\&Norm of the layer. The router has two linear layers with a ReLU and is applied to every token:
+\begin{equation}
+r^{\ell}(h)=A^{\ell}_2\,\mathrm{ReLU}\big(A^{\ell}_1h+c^{\ell}_1\big)+c^{\ell}_2,
+\label{eq:router}
+\end{equation}
+with $A^{\ell}_1\in\mathbb{R}^{d\times d}$ and $A^{\ell}_2\in\mathbb{R}^{T\times d}$. The twelve routers hold $12\,(d^2+d+Td+T)=7{,}133{,}244$ trainable parameters. Token outputs are averaged over non-padding positions, using the attention mask $m_j\in\{0,1\}$, to give one vector per input, so that padding does not affect routing:
+\begin{equation}
+w^{\ell}(x)=\frac{\sum_j m_j\,r^{\ell}(h^{\ell}_j)}{\sum_j m_j}\in\mathbb{R}^{T}.
+\label{eq:gating}
+\end{equation}
+For an input $x$, each upscaled linear layer is rebuilt from its pre-trained weights and its part of the task vectors, and its bias is rebuilt in the same way:
+\begin{equation}
+W^{\ell}(x)=W_0^{\ell}+\sum_{i=1}^{T}w_i^{\ell}(x)\,\tau_i^{\ell},\qquad
+b^{\ell}(x)=b_0^{\ell}+\sum_{i=1}^{T}w_i^{\ell}(x)\,\tau_i^{\ell,b}.
+\label{eq:we}
+\end{equation}
+Both linear layers of a block share the same $w^{\ell}(x)$. The prediction uses the head $g_t$ of the known task, where $\bar\theta$ denotes the statically merged weights:
+\begin{equation}
+p(y\mid x,t)=\mathrm{softmax}\Big(g_t\big(\mathrm{pool}(\mathrm{BERT}(x;\bar\theta,\{W^{\ell}(x)\}))\big)\Big),\quad
+\hat y=\arg\max_{y}\,p(y\mid x,t).
+\label{eq:prediction}
+\end{equation}
+
+\begin{figure}[htbp]
+  \centering
+  \begin{minipage}[c]{.25\linewidth}\centering\includegraphics[width=\linewidth]{arch_wemoe_module.png}\end{minipage}\hfill
+  \begin{minipage}[c]{.72\linewidth}\centering\resizebox{\linewidth}{!}{\input{figures_v3/router}}\end{minipage}
+  \caption{Left: the WEMoE module of Tang et al.~\cite{tang2024wemoe}. Right: router of layer $\ell$ as implemented, applied per token and averaged over non-padding tokens.}
+  \label{fig:router}
+\end{figure}
+
+The router's values are \emph{unnormalised}. With no softmax and no top-$k$ selection, a value can exceed 1 or be negative, so a router can amplify or subtract a task vector, and the combination is neither convex nor sparse. Linear weights are initialised from $\mathcal{N}(0,0.01^2)$ with $c^{\ell}_1=0$ and $c^{\ell}_2=\lambda$, so $w^{\ell}_i(x)\approx\lambda$ at the start and the model begins close to Task Arithmetic. Unit tests on small random models confirm that constant routing equals Task Arithmetic, that padding does not affect routing and that only the routers receive gradients.
+
+\section{Few-Shot Fine-Tuning (FSFT) Objective}
+\label{sec:fsft}
+
+The routers are trained with Few-Shot Fine-Tuning: cross-entropy on a small labelled set, summed over the tasks. For each task, $k$ examples $D_t^{(k)}$ are drawn from a reserved pool, and for a fixed seed a smaller $k$ gives a subset of a larger one. At each step, one mini-batch $B_t$ is drawn per task, and the objective is
+\begin{equation}
+\min_{\phi}\ \sum_{t=1}^{T}\ \frac{1}{|B_t|}\sum_{(x,y)\in B_t}-\log p_{\phi}(y\mid x,t),
+\qquad B_t\subset D_t^{(k)},\ \ |D_t^{(k)}|=k ,
+\label{eq:fsft}
+\end{equation}
+where $p_\phi$ is the distribution of Equation~\eqref{eq:prediction}. Everything except $\phi$ stays frozen, and dropout is disabled. The mean development score is evaluated before training and every 50 steps, and the router state of the best step is restored at the end. A run whose best step is 0 therefore reports the untrained router.
+
+Table~\ref{tab:comparison} separates the original method from this study. The largest difference is the objective. Tang et al.\ minimise prediction entropy on unlabelled test data, which is test-time adaptation, and this objective is not used here. FSFT instead uses labelled training examples and never touches the reporting split. The results of the two studies are therefore not directly comparable.
+
+\begin{table}[htbp]
+  \centering\tablestyle
+  \caption{The original WEMoE study of Tang et al.~\cite{tang2024wemoe} and this study.}
+  \label{tab:comparison}
+  \begin{tabularx}{\linewidth}{>{\bfseries\raggedright\arraybackslash}p{2.9cm} *{2}{>{\raggedright\arraybackslash}X}}
+    \toprule
+    Aspect & Tang et al. & This study\\
+    \midrule
+    Backbone, tasks & CLIP-ViT vision models; eight image classification tasks & BERT-base; five binary GLUE tasks\\
+    Router training & Test-time adaptation: entropy on unlabelled test data & FSFT: cross-entropy on $k$ labelled examples per task\\
+    Routing input & Mean over tokens & Mean over non-padding tokens\\
+    Upscaled modules & Transformer MLPs & Full MLP; intermediate-only as an ablation\\
+    \bottomrule
+  \end{tabularx}
+\end{table}

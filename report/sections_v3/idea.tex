@@ -1,0 +1,43 @@
+\chapter{The Idea}
+\label{ch:idea}
+
+\section{Mixture of Experts: The Core Concept}
+
+A Mixture of Experts (MoE)~\cite{jacobs1991adaptive,shazeer2017moe,mu2025survey} solves a problem through several specialised networks $E_1,\dots,E_n$ and a small network called the \emph{router} or gate, $G$, which decides how much each expert counts for the current input (Figure~\ref{fig:moe}):
+\begin{equation}
+\mathrm{MoE}(x)=C\big(\{G_i(x)\cdot E_i(x)\}_{i=1}^{n}\big),
+\label{eq:moe}
+\end{equation}
+where $G_i(x)$ is the contribution of expert $i$ and $C$ is a combination function, classically a sum. Because $G$ takes $x$ as its input, the contributions differ from one input to the next. This is the dynamic behaviour that objective O1 asks for.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=.38\linewidth]{arch_moe.png}
+  \caption{A Mixture of Experts layer, from Mu and Lin~\cite{mu2025survey}. The router sets the contribution of each expert for the current input.}
+  \label{fig:moe}
+\end{figure}
+
+\section{From Output Ensembling to Weight Ensembling}
+
+Equation~\eqref{eq:moe} combines expert \emph{outputs}. Applied directly, it would run every expert for every input, so inference cost would grow with the number of experts and the experts would need a shared output space. Weight-Ensembling Mixture of Experts (WEMoE)~\cite{tang2024wemoe} keeps the router but changes what is combined. An expert is represented by its task vector, the router's values scale those vectors, and the resulting weights are assembled before they are applied (Figure~\ref{fig:we}).
+
+The two forms are not equivalent. For a single linear layer, $(\sum_i w_iW_i)h=\sum_i w_i(W_ih)$, but this equality is lost across non-linear activations and stacked layers. Weight ensembling therefore defines a different function from an ensemble of the experts' outputs. Its potential benefits are one forward pass per input, one checkpoint, and a shared encoder. Its costs are that task vectors must stay stored for every upscaled module, that routers need data to train, and that each input needs its own weights assembled at run time, which can make inference slower even when fewer parameters are stored. Section~\ref{sec:efficiency} measures these costs.
+
+\begin{figure}[htbp]
+  \centering
+  \resizebox{.62\linewidth}{!}{\input{figures/weight_ensembling}}
+  \caption{Parameter-level combination used in this study (a), contrasted with output-level combination (b), which is shown only for reference.}
+  \label{fig:we}
+\end{figure}
+
+\section{Implementation Flow: From Datasets to Evaluation}
+\label{sec:flow}
+
+Figure~\ref{fig:flow} shows the implementation flow in four stages. Stage 1 prepares the five GLUE tasks and divides each official training split into three parts. Stage 2 fine-tunes one expert per task from the pre-trained model, then keeps its task vector and classification head. Stage 3 merges these into one model and trains its routers on the few-shot pool. Stage 4 reports scores on the official validation splits, together with storage and latency. The development split selects the best epoch, the scaling factor $\lambda$ and the best router step, so no selection touches the reported data. Expert weights stay frozen after Stage 2, and only the routers learn in Stage 3.
+
+\begin{figure}[htbp]
+  \centering
+  \resizebox{.8\linewidth}{!}{\input{figures_v3/flow}}
+  \caption{Implementation flow: from datasets to evaluation. Dashed arrows show where the development split selects a model. $\theta_i$ and $\tau_i$ are defined in Section~\ref{sec:problem}, $g_i$ is the classification head of expert $i$, and $\lambda$ is the Task Arithmetic scaling factor of Section~\ref{sec:ta}.}
+  \label{fig:flow}
+\end{figure}

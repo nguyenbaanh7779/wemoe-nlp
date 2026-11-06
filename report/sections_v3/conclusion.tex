@@ -1,0 +1,39 @@
+\chapter{Conclusion and Future Work}
+\label{ch:conclusion}
+
+\section{Answers to the Research Questions}
+
+\paragraph{RQ1.} With 256 labelled examples per task, routers raise the average score from 57.4 to $69.9\pm0.1$ and the gain over majority from 18.4\% to 59.1\%. A clear gap to the experts (78.2) remains.
+
+\paragraph{RQ2.} The average rises from 60.8 at $k=16$ to 64.6 at $k=64$ and 69.9 at $k=256$, and it has not levelled off. Small budgets are unstable across seeds.
+
+\paragraph{RQ3.} Fixed coefficients reach only 58.4, so better static coefficients alone do not explain the improvement, although the ablation does not separate input dependence from capacity.
+
+\paragraph{RQ4.} Full-MLP and intermediate-only upscaling reach similar averages with different failures, on RTE and on MRPC respectively. Intermediate-only needs 47.2\% of the storage of five models, against 73.1\%. At batch size 32, the two are about 2.9 and 4.5 times slower than one BERT.
+
+\section{Assessment of the Objectives}
+
+Table~\ref{tab:goals} assesses the objectives of Section~\ref{sec:problem} against the evidence.
+
+\begin{table}[htbp]
+  \centering\tablestyle
+  \caption{The objectives of the problem statement against the results.}
+  \label{tab:goals}
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{3.2cm} X >{\raggedright\arraybackslash}p{5.2cm}}
+    \toprule
+    Objective & Evidence & Assessment\\
+    \midrule
+    O1. Dynamic integration & Per-input MLP weights; fixed coefficients reach 58.4, against 69.9 & Met by design; the contribution of input dependence is supported but not isolated\\
+    O2. Close to the task-specific models & 69.9 against 78.2, gain 59.1\%; RTE and MRPC remain weak; no task reaches its expert & Partly met\\
+    O3. Fewer stored parameters & 73.1\% (full MLP) or 47.2\% (intermediate-only) of five models & Met, at a cost in latency\\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\section{Main Contributions and Practical Implications}
+
+The contribution is practical, and no novel algorithm is claimed. This study adapts WEMoE to the post-norm BERT encoder with attention-mask-aware routing, applies a protocol that separates the data of each stage, and evaluates two upscaling scopes, three labelled budgets and an input-independent ablation against a majority-class floor. In practice, input-conditioned merging clearly beats the static merge on average but not the task-specific experts, and its case rests mainly on storage constraints.
+
+\section{Future Work}
+
+Merging four tasks without RTE would test whether RTE interferes with the other tasks. Larger budgets ($k=512$ and $1024$) would show whether the score levels off, and more FSFT steps would test the intermediate-only variant. Measuring task-vector norms per module type would check the reason for upscaling the MLP on BERT. A strict protocol would cap dev at $k$, and more seeds for the experts and the data split would give more reliable estimates. Per-example analysis would show what routing variation within a task follows.

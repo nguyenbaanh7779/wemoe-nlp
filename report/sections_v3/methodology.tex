@@ -1,0 +1,113 @@
+\chapter{Experimental Methodology}
+\label{ch:method}
+
+\section{The Five Binary GLUE Tasks and Their Datasets}
+
+The experiments use five binary tasks of the General Language Understanding Evaluation benchmark (GLUE)~\cite{wang2019glue}, loaded through the Hugging Face Datasets library~\cite{lhoest2021datasets} and listed in Table~\ref{tab:data}: MRPC~\cite{dolan2005mrpc}, RTE~\cite{dagan2006rte}, CoLA~\cite{warstadt2019cola}, SST-2~\cite{socher2013sst} and QNLI, which is derived from SQuAD~\cite{rajpurkar2016squad}. CoLA and SST-2 take a single sentence, while MRPC, RTE and QNLI take a pair. Inputs are tokenised and truncated to 128 tokens. The tasks differ widely in size, as Table~\ref{tab:split} shows, and in how much a constant prediction scores, as the last column of Table~\ref{tab:data} shows.
+
+\begin{table}[htbp]
+  \centering\tablestyle
+  \caption{The five GLUE tasks. ``Maj.\ \%'' is the validation accuracy of always predicting the most frequent label.}
+  \label{tab:data}
+  \setlength{\tabcolsep}{3.5pt}\begin{tabularx}{\linewidth}{l X l l l r}
+    \toprule
+    Task & Decides whether\ldots & Input fields & Labels & Metric & Maj.\ \%\\
+    \midrule
+    MRPC & two sentences are paraphrases & sentence1, sentence2 & not\_equivalent / equivalent & acc + F1 & 68.4\\
+    RTE & a sentence entails another & sentence1, sentence2 & entailment / not\_entailment & accuracy & 52.7\\
+    CoLA & a sentence is grammatical & sentence & unacceptable / acceptable & MCC & 69.1\\
+    SST-2 & a sentence is positive or negative & sentence & negative / positive & accuracy & 50.9\\
+    QNLI & a sentence answers a question & question, sentence & entailment / not\_entailment & accuracy & 50.5\\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\section{Data Splits and Experimental Protocol}
+\label{sec:protocol}
+
+The official training split of each task is permuted once with seed 42 and divided into three disjoint parts (Table~\ref{tab:split}). Four kinds of data therefore have distinct roles:
+
+\begin{itemize}
+  \item \textbf{Expert training data} is everything left after the two reservations below. Only the experts train on it.
+  \item \textbf{The few-shot pool} holds 256 labelled examples per task, and $k$ of them train the routers. The experts never see it.
+  \item \textbf{The development split} (dev) is 10\% of the official training split, with at most 1,000 examples. It makes every choice: expert epoch, $\lambda$ and FSFT step.
+  \item \textbf{The official validation split} is used for reported scores only.
+\end{itemize}
+
+GLUE test splits are not used. Their labels are hidden in the dataset for four of the tasks, and the MRPC test labels were also left unused. This protocol prevents the main forms of leakage, at a cost: RTE, the smallest task, keeps only 1,985 of its 2,490 training pairs for its expert.
+
+\begin{table}[htbp]
+  \centering\tablestyle
+  \caption{Data splits per task. The last row gives the use of each split.}
+  \label{tab:split}
+  \begin{tabular}{l r r r r r}
+    \toprule
+    Task & Official train & Few-shot pool & Dev & Expert train & Official validation\\
+    \midrule
+    MRPC & 3,668 & 256 & 367 & 3,045 & 408\\
+    RTE & 2,490 & 256 & 249 & 1,985 & 277\\
+    CoLA & 8,551 & 256 & 855 & 7,440 & 1,043\\
+    SST-2 & 67,349 & 256 & 1,000 & 66,093 & 872\\
+    QNLI & 104,743 & 256 & 1,000 & 103,487 & 5,463\\
+    \midrule
+    \textbf{Used for} & & \textbf{FSFT} & \textbf{Selection} & \textbf{Experts} & \textbf{Reporting}\\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Training the Five Task-Specific Experts}
+
+Each expert fine-tunes all layers of \texttt{bert-base-uncased} and a new two-class head with cross-entropy on its expert-training data. All five use one recipe, shown in the first column of Table~\ref{tab:config}, with no per-task tuning, and the best of three epochs is chosen on dev by task score. AdamW~\cite{loshchilov2019adamw} applies weight decay only to parameters with at least two dimensions.
+
+\begin{table}[htbp]
+  \centering\tablestyle
+  \caption{Training configuration of the two optimisation stages.}
+  \label{tab:config}
+  \begin{tabularx}{\linewidth}{>{\bfseries}l *{2}{>{\raggedright\arraybackslash}X}}
+    \toprule
+    Setting & Task-specific experts & FSFT (routers)\\
+    \midrule
+    Trainable parameters & All of BERT and the head (109.5M per expert) & Routers only (7.1M); 60 in the input-independent variant\\
+    Optimiser & AdamW; weight decay 0.01 & AdamW; no weight decay\\
+    Learning rate & $2\times10^{-5}$ & $10^{-4}$; $10^{-3}$ in the input-independent variant\\
+    Schedule & Linear, 10\% warm-up & Linear, 10\% warm-up\\
+    Batch size, duration & 32; 3 epochs & 16 per task; 500 steps\\
+    Gradient clipping & Norm 1.0 & None\\
+    Selection on dev & Best epoch by task score & Best step by mean score, every 50 steps\\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\section{Merging the Experts and Training the Router with Few-Shot Data}
+\label{sec:merging}
+
+Task Arithmetic selects $\lambda$ from $\{0.1,0.2,\dots,1.0\}$ by the mean dev score (Table~\ref{tab:lambda}). The score peaks at $\lambda=0.3$, and this value initialises the merged models. Dev can mislead for merged models on SST-2: at $\lambda=0.3$, Task Arithmetic scores 83.7 on dev but 69.8 on validation. The two splits differ in kind, since SST-2 training texts average 9.4 words and validation texts 19.5. Selecting on dev remains the correct procedure, but its SST-2 scores overstate merged-model quality.
+
+\begin{table}[htbp]
+  \centering\tablestyle
+  \caption{Development scores of Task Arithmetic over the $\lambda$ grid ($\times100$).}
+  \label{tab:lambda}
+  \begin{tabular}{l c c c c c c c c c c}
+    \toprule
+    $\lambda$ & 0.1 & 0.2 & \textbf{0.3} & 0.4 & 0.5 & 0.6 & 0.7 & 0.8 & 0.9 & 1.0\\
+    \midrule
+    Mean dev score & 52.0 & 57.4 & \textbf{62.8} & 60.7 & 58.6 & 58.0 & 57.5 & 57.3 & 57.4 & 57.1\\
+    SST-2 dev score & 62.4 & 73.3 & \textbf{83.7} & 89.8 & 91.7 & 92.3 & 93.0 & 93.2 & 92.9 & 92.5\\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Fifteen FSFT runs were performed, three seeds for each of five configurations. The main model is \emph{full-MLP} WEMoE with $k\in\{16,64,256\}$. Two \emph{ablations}, which change one component and keep the rest fixed, use $k=256$. The \emph{intermediate-only} variant upscales fc1 alone, and fc2 uses Task Arithmetic. The \emph{input-independent} variant has no router: it learns one coefficient per expert per layer, the same for every input, for 60 numbers in total. It starts exactly at Task Arithmetic and tests whether routing on the input is needed. Its learning rate is higher because it has so few parameters.
+
+\section{Evaluation Metrics, Baselines, Seeds and Reproducibility}
+\label{sec:metrics}
+
+\paragraph{Metrics.} Scores are multiplied by 100. The \emph{task score} $S_t$ follows GLUE conventions: the mean of accuracy and F1 for MRPC, the Matthews Correlation Coefficient (MCC)~\cite{matthews1975mcc} for CoLA, and accuracy for the others. MCC is a correlation between predictions and labels, and a constant prediction scores 0. The \emph{average score} is the unweighted mean of the five task scores, and the \emph{normalised score} is the mean of $S_t(m)/S_t(\mathrm{expert})$ for a model $m$. A constant prediction already scores about 75 on MRPC and about 50 on the accuracy tasks, so the normalised score flatters weak models. The \emph{gain over majority} corrects for this, with 0 for a constant guess and 100 for the expert:
+\begin{equation}
+\mathrm{Gain}(m)=\frac{100}{T}\sum_{t=1}^{T}\frac{S_t(m)-S_t(\mathrm{majority})}{S_t(\mathrm{expert})-S_t(\mathrm{majority})}.
+\label{eq:gain}
+\end{equation}
+
+\paragraph{Baselines.} The \emph{majority class} always predicts the most frequent validation label, which is the score of a model collapsed to a constant prediction. \emph{Simple Averaging} is Task Arithmetic with $\lambda=1/5$. \emph{Task Arithmetic} uses the selected $\lambda=0.3$. \emph{WEMoE init} is the merged model before router training. The five experts are the upper reference point.
+
+\paragraph{Seeds and reproducibility.} The data split and the experts use seed 42. FSFT uses seeds 0, 1 and 2, where a seed sets the router initialisation and the few-shot sample, while the experts and the data split stay fixed. Runs used Google Colab with one NVIDIA Tesla T4 GPU and mixed precision, with PyTorch 2.11.0, Datasets 4.8.5 and scikit-learn 1.6.1. The recorded Transformers~\cite{wolf2020transformers} version is 5.20.2 for the experts and most FSFT runs, and 5.22.0 for the baseline evaluation and the input-independent runs.
