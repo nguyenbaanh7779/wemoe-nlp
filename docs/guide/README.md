@@ -142,11 +142,11 @@ The routing heatmap needs `results/wemoe/full-mean-k256-s0/predictions_validatio
 
 **Input.** Type a sentence or a pair of sentences, or pick one of three preset GLUE validation examples per task.
 
-**Task.** Selecting a task is optional.
-- **Auto** (the default) scores the input for every task that fits it: one sentence for CoLA and SST-2, a pair for MRPC, RTE and QNLI.
-- Selecting a task scores the input for that task only.
+**Task.** The demo starts on SST-2.
+- Selecting a task scores the input for that task only. This is the mode to present with: one row, with ✓ or ✗ against the gold label of a preset example.
+- **Auto**, the last option, scores the input for every task that fits it: one sentence for CoLA and SST-2, a pair for MRPC, RTE and QNLI. Only the row of the example's own task has a gold label. The other rows score the sentence for a task it does not belong to, so they cannot be right or wrong.
 
-The routers see only the text, so one input gets one set of routing weights, whichever task it is scored for.
+The routers see only the text, so one input gets one set of routing weights, whichever task it is scored for. Auto shows this directly: several rows share one routing chart.
 
 **Output.**
 - A table with the predictions of the single-task expert, Task Arithmetic and WEMoE for each task. For a preset example, each prediction is marked ✓ or ✗ against the gold label.

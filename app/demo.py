@@ -45,6 +45,7 @@ FIELD_LABELS = {
 }
 AUTO_HELP = ("**Auto**: the input is scored for every task that fits it. "
              "One sentence: CoLA and SST-2. Two sentences: MRPC, RTE and QNLI.")
+DEFAULT_TASK = "sst2"  # Auto is offered last: its extra rows have no gold label and are hard to read
 DEFAULT_EXAMPLE = "sst2:1"  # "it 's slow -- very , very slow .": Task Arithmetic gets it wrong, WEMoE right
 
 # Same diverging blue <-> red scale as docs/report/figures/routing.png: blue adds a task vector, red subtracts it
@@ -237,18 +238,20 @@ def build_app(backend: DemoBackend) -> gr.Blocks:
         return (results_table(result, gold, lam), routing_bars(routing, experts, selected, lam),
                 routing_heatmap(routing, experts, selected), routing_summary(routing, experts, selected, lam))
 
-    default_a, default_b, default_gold, default_gold_md = fill(AUTO, DEFAULT_EXAMPLE)
+    default_a, default_b, default_gold, default_gold_md = fill(DEFAULT_TASK, DEFAULT_EXAMPLE)
+    default_labels = FIELD_LABELS[DEFAULT_TASK]
     with gr.Blocks(title="WEMoE demo") as app:
         gr.Markdown(INTRO)
         gold = gr.State(default_gold)
         with gr.Row():
             with gr.Column(scale=4):
-                task = gr.Radio([("Auto", AUTO)] + [(TASK_NAMES[t], t) for t in backend.tasks], value=AUTO,
+                task = gr.Radio([(TASK_NAMES[t], t) for t in backend.tasks] + [("Auto", AUTO)], value=DEFAULT_TASK,
                                 label="Task")
-                question = gr.Markdown(AUTO_HELP)
-                example = gr.Dropdown(example_choices(AUTO), value=DEFAULT_EXAMPLE, label="Example from GLUE validation")
-                text_a = gr.Textbox(default_a, label=FIELD_LABELS[AUTO][0], lines=2)
-                text_b = gr.Textbox(default_b, label=FIELD_LABELS[AUTO][1], lines=2)
+                question = gr.Markdown(f"**{TASK_NAMES[DEFAULT_TASK]}**: {TASK_QUESTIONS[DEFAULT_TASK]}")
+                example = gr.Dropdown(example_choices(DEFAULT_TASK), value=DEFAULT_EXAMPLE,
+                                      label="Example from GLUE validation")
+                text_a = gr.Textbox(default_a, label=default_labels[0], lines=2)
+                text_b = gr.Textbox(default_b, label=default_labels[-1], lines=2, visible=len(default_labels) == 2)
                 gold_md = gr.Markdown(default_gold_md)
                 predict = gr.Button("Predict", variant="primary")
             with gr.Column(scale=6):
@@ -286,7 +289,7 @@ def main() -> None:
     print(f"Loading the experts, Task Arithmetic and WEMoE ({args.run}) on {device}...", flush=True)
     backend = DemoBackend.from_checkpoints(args.checkpoint_dir, args.results_dir, args.run, DEFAULT_TASKS,
                                            device=device)
-    backend.predict(list(parse_example(DEFAULT_EXAMPLE)[1]["texts"]))  # warm-up
+    backend.predict(list(parse_example(DEFAULT_EXAMPLE)[1]["texts"]), [DEFAULT_TASK])  # warm-up
     app = build_app(backend)
     app.queue(default_concurrency_limit=1)  # one request at a time
     app.launch(server_name=args.host, server_port=args.port, share=args.share)
