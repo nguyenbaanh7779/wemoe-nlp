@@ -47,9 +47,11 @@ AUTO_HELP = ("**Auto**: the input is scored for every task that fits it. "
              "One sentence: CoLA and SST-2. Two sentences: MRPC, RTE and QNLI.")
 DEFAULT_EXAMPLE = "sst2:1"  # "it 's slow -- very , very slow .": Task Arithmetic gets it wrong, WEMoE right
 
-# Same diverging blue <-> red scale as docs/report/figures/routing.png
-INK, INK_2, SURFACE, HIGHLIGHT = "#0b0b0b", "#52514e", "#fcfcfb", "#eda100"
-DIVERGING = LinearSegmentedColormap.from_list("blue_gray_red", ["#a32a2a", "#e34948", "#f0efec", "#3987e5", "#184f95"])
+# Same diverging blue <-> red scale as docs/report/figures/routing.png: blue adds a task vector, red subtracts it
+INK, INK_2, GRID, AXIS = "#0b0b0b", "#52514e", "#e1e0d9", "#c3c2b7"
+SURFACE, HIGHLIGHT = "#fcfcfb", "#eda100"
+ADD, SUBTRACT = "#3987e5", "#e34948"
+DIVERGING = LinearSegmentedColormap.from_list("blue_gray_red", ["#a32a2a", SUBTRACT, "#f0efec", ADD, "#184f95"])
 
 INTRO = """
 # WEMoE: five BERT experts merged into one model
@@ -109,11 +111,46 @@ def results_table(result, gold, lam: float) -> str:
     return "\n".join([header] + rows) + note
 
 
-def routing_figure(routing: np.ndarray, experts, task) -> Figure:
-    """Heatmap of the routing weights of one input: layers (rows) x expert task vectors (columns).
+def routing_bars(routing: np.ndarray, experts, task, lam: float) -> Figure:
+    """Mean routing weight per expert over the layers, with Task Arithmetic's constant lambda as reference.
 
     A plain ``Figure`` (not pyplot), so figures are freed once Gradio has rendered them.
     """
+    means = routing.mean(axis=0)
+    x = np.arange(len(experts))
+    fig = Figure(figsize=(5.4, 3.6), dpi=150, facecolor=SURFACE)
+    ax = fig.subplots()
+    ax.set_facecolor(SURFACE)
+    ax.bar(x, means, width=0.32, color=[ADD if m >= 0 else SUBTRACT for m in means], zorder=3)
+    ax.axhline(0, color=AXIS, linewidth=1, zorder=2)
+    ax.axhline(lam, color=INK_2, linewidth=1, linestyle=(0, (4, 3)), zorder=2)
+    for xi, m in zip(x, means):
+        ax.annotate(f"{m:+.2f}", (xi, m), xytext=(0, 3 if m >= 0 else -3), textcoords="offset points",
+                    ha="center", va="bottom" if m >= 0 else "top", fontsize=8, color=INK)
+    low, high = min(0.0, float(means.min())), max(lam, float(means.max()))
+    pad = 0.18 * (high - low) + 0.05
+    ax.set_ylim(low - (pad if low < 0 else 0.05), high + pad)
+    ax.set_xlim(-0.6, len(experts) - 0.4)
+    ax.tick_params(length=0, labelsize=8, colors=INK_2)
+    ax.set_xticks(x, [TASK_NAMES.get(e, e) for e in experts], fontsize=8.5)
+    for label, expert in zip(ax.get_xticklabels(), experts):  # after tick_params, which would reset the colors
+        label.set_color(INK if expert == task else INK_2)
+        label.set_fontweight("bold" if expert == task else "normal")
+    ax.grid(axis="y", color=GRID, linewidth=0.8, zorder=0)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    ax.set_ylabel("Mean weight over the 12 layers", fontsize=8.5, color=INK_2)
+    xlabel = "Expert task vector" + (" (selected task in bold)" if task in experts else "")
+    ax.set_xlabel(xlabel, fontsize=8.5, color=INK_2)
+    ax.set_title("WEMoE: how much of each expert this input gets", fontsize=9, color=INK, loc="left", pad=16)
+    ax.text(0, 1.02, f"Dashed line: Task Arithmetic, {lam:g} for every expert", transform=ax.transAxes,
+            ha="left", va="bottom", fontsize=7.5, color=INK_2)
+    fig.tight_layout()
+    return fig
+
+
+def routing_heatmap(routing: np.ndarray, experts, task) -> Figure:
+    """Heatmap of the routing weights of one input: layers (rows) x expert task vectors (columns)."""
     layers, num_experts = routing.shape
     limit = max(float(np.abs(routing).max()), 0.5)
     fig = Figure(figsize=(5.4, 5.6), dpi=150, facecolor=SURFACE)
@@ -196,8 +233,9 @@ def build_app(backend: DemoBackend) -> gr.Blocks:
         except ValueError as error:
             raise gr.Error(str(error))
         selected = None if task == AUTO else task
-        return (results_table(result, gold, lam), routing_figure(result.routing, result.expert_names, selected),
-                routing_summary(result.routing, result.expert_names, selected, lam))
+        routing, experts = result.routing, result.expert_names
+        return (results_table(result, gold, lam), routing_bars(routing, experts, selected, lam),
+                routing_heatmap(routing, experts, selected), routing_summary(routing, experts, selected, lam))
 
     default_a, default_b, default_gold, default_gold_md = fill(AUTO, DEFAULT_EXAMPLE)
     with gr.Blocks(title="WEMoE demo") as app:
@@ -215,10 +253,14 @@ def build_app(backend: DemoBackend) -> gr.Blocks:
                 predict = gr.Button("Predict", variant="primary")
             with gr.Column(scale=6):
                 table = gr.Markdown()
-                plot = gr.Plot(label="Routing weights", format="png")  # the default WebP smears the cells
+                with gr.Tabs():  # PNG: the default WebP smears the heatmap cells
+                    with gr.Tab("Mean over layers"):
+                        bars = gr.Plot(label="Mean routing weight per expert", format="png")
+                    with gr.Tab("Per layer (heatmap)"):
+                        heatmap = gr.Plot(label="Routing weight per layer and expert", format="png")
                 summary = gr.Markdown()
 
-        inputs, outputs = [task, text_a, text_b, gold], [table, plot, summary]
+        inputs, outputs = [task, text_a, text_b, gold], [table, bars, heatmap, summary]
         task.change(on_task, [task, example], [question, text_a, text_b, example, gold, gold_md]).then(
             on_predict, inputs, outputs)
         example.input(on_example, [task, example], [text_a, text_b, gold, gold_md]).then(on_predict, inputs, outputs)

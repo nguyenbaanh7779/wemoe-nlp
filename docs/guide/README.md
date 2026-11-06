@@ -150,7 +150,9 @@ The routers see only the text, so one input gets one set of routing weights, whi
 
 **Output.**
 - A table with the predictions of the single-task expert, Task Arithmetic and WEMoE for each task. For a preset example, each prediction is marked ✓ or ✗ against the gold label.
-- A heatmap of the routing weights WEMoE used for the input (12 layers × 5 experts).
+- The routing weights WEMoE used for the input, in two tabs. Blue adds an expert's task vector and red subtracts it.
+  - **Mean over layers** (the default) is a bar chart with one bar per expert: its weight averaged over the 12 layers. A dashed line marks Task Arithmetic's 0.3.
+  - **Per layer (heatmap)** shows all 12 layers × 5 experts.
 
 **WEMoE model.** The demo uses the full-MLP model of the report, `full-mean-k256-s0`. Another run can be passed with `--run`.
 
