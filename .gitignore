@@ -248,7 +248,7 @@ slide/*.vrb
 slide/*.fls
 slide/*.fdb_latexmk
 slide/*.synctex.gz
-slide/main.pdf
+slide/*.pdf
 
 # Local editor settings (LaTeX Workshop recipes with machine-specific paths)
 .vscode/settings.json
@@ -265,4 +265,4 @@ report/*.lot
 report/*.fls
 report/*.fdb_latexmk
 report/*.synctex.gz
-report/main.pdf
+report/*.pdf
