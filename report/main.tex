@@ -1,42 +1,134 @@
-% WEMoE-NLP research report. Build: latexmk -pdf main.tex (pdfLaTeX + BibTeX, as required by the theme).
-\input{theme_preamble}
+% !LW recipe=xelatex-bibtex
+% Build: xelatex main, bibtex main, xelatex main, xelatex main (the recipe is in .vscode/settings.json).
+% Same template as the customer-churn-prediction report.
+\documentclass[a4paper,11pt]{report}
 
-% Additions to the theme: natbib is required by the theme's plainnat bibliography style.
+% ---- Page layout ----
+\usepackage[margin=2.5cm]{geometry}
+
+% ---- Fonts (XeLaTeX; needed for correct Vietnamese diacritics) ----
+\usepackage{fontspec}
+
+% ---- Typography & links ----
+\usepackage{microtype}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks = true,
+    linkcolor  = blue!50!black,
+    citecolor  = blue!50!black,
+    urlcolor   = blue!50!black,
+    pdftitle   = {Merging Five GLUE NLP Tasks Using Weight-Ensembling Mixture of Experts},
+    pdfauthor  = {Nguyễn Bá Anh; Phạm Nguyên Đăng}
+}
+
+% ---- Math ----
+\usepackage{amsmath,amssymb,mathtools}
+
+% ---- Figures & tables ----
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{tikz}
+\graphicspath{{figures/}}
+\input{figures/styles}
+
+% ---- References ----
 \usepackage[numbers,sort&compress]{natbib}
 \usepackage{url}
-\input{figures/styles}
-\pgfplotsset{compat=1.18}
-\graphicspath{{figures/}}
-% The vietnam package switches the document labels to Vietnamese; this report is in English.
-\AtBeginDocument{\renewcommand{\chaptername}{Chapter}\renewcommand{\figurename}{Figure}\renewcommand{\tablename}{Table}\renewcommand{\bibname}{References}}
-\newcommand{\tablestyle}{\footnotesize\def\baselinestretch{1.05}\selectfont\renewcommand{\arraystretch}{1.12}\setlength{\tabcolsep}{4.5pt}\setlength{\belowcaptionskip}{4pt}}
-\newcommand{\code}[1]{\texttt{\small #1}}
-\hypersetup{pdftitle={Merging BERT Experts with Weight-Ensembling Mixture of Experts},
-  pdfauthor={Nguyen Ba Anh; Nguyen Thi Nha Linh},colorlinks=true,linkcolor=NavyBlue,citecolor=NavyBlue,urlcolor=NavyBlue}
-\setlength{\headheight}{15pt}
-\setlength{\emergencystretch}{1.5em}
+
+% ---- Header / footer ----
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\rfoot{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+
+% ---- Macros used by the chapters and figures ----
+% Compact type for tables
+\newcommand{\tablestyle}{\footnotesize\renewcommand{\arraystretch}{1.12}\setlength{\tabcolsep}{4.5pt}}
+% Small type inside TikZ figures
+\newcommand{\figfont}{\fontsize{7}{8.4}\selectfont}
 \hyphenation{WEMoE GLUE BERT}
+\renewcommand{\bibname}{References}
 
 \begin{document}
-\input{sections/cover}
 
-\newpage
-\pagenumbering{arabic}
-\renewcommand{\contentsname}{\color{NavyBlue}{CONTENTS}}
-{\def\baselinestretch{1.0}\selectfont\tableofcontents}
+\begin{titlepage}
+    \centering
+    \vspace*{3cm}
 
-\input{sections/abstract}
-\input{sections/introduction}
-\input{sections/background}
-\input{sections/methodology}
-\input{sections/experiments}
-\input{sections/results}
-\input{sections/conclusion}
+    {\LARGE\bfseries Merging Five GLUE NLP Tasks Using\\Weight-Ensembling Mixture of Experts}\\[0.4cm]
+    {\Large Few-Shot Router Training on a Shared BERT Backbone}\\[2cm]
 
-\cleardoublepage
+    \rule{0.8\linewidth}{0.6pt}\\[0.5cm]
+    {\large Introduction to Deep Learning Project Report}\\[0.2cm]
+    \rule{0.8\linewidth}{0.6pt}
+
+    \vfill
+
+    \begin{tabular}{ll}
+        \textbf{Instructor:} & Trần Việt Trung \\
+    \end{tabular}
+
+    \vspace{0.8cm}
+
+    \textbf{Group Members}\\[0.3cm]
+    \begin{tabular}{ll}
+        Nguyễn Bá Anh & 20261218M \\
+        Phạm Nguyên Đăng & 20261209M \\
+    \end{tabular}
+
+    \vspace{1cm}
+    {\large Hanoi University of Science and Technology}\\[0.3cm]
+    {\large \today}
+
+    \vspace*{1cm}
+\end{titlepage}
+
+\tableofcontents
+
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+\markright{Abstract}
+\input{content/abstract}
+
+\chapter{The Problem}
+\label{ch:problem}
+\input{content/problem}
+
+\chapter{The Idea}
+\label{ch:idea}
+\input{content/idea}
+
+\chapter{Theory and Method: WEMoE}
+\label{ch:theory}
+\input{content/theory}
+
+\chapter{Experimental Methodology}
+\label{ch:method}
+\input{content/methodology}
+
+\chapter{Results}
+\label{ch:results}
+\input{content/results}
+
+\chapter{Trade-offs and Discussion}
+\label{ch:discussion}
+\input{content/discussion}
+
+\chapter{Conclusion and Future Work}
+\label{ch:conclusion}
+\input{content/conclusion}
+
+\clearpage
 \phantomsection
 \addcontentsline{toc}{chapter}{References}
-{\small\def\baselinestretch{1.0}\selectfont\setlength{\bibsep}{2pt}
 \bibliographystyle{plainnat}
-\bibliography{references}}
+\bibliography{references}
+
 \end{document}

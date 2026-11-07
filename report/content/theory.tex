@@ -1,6 +1,3 @@
-\chapter{Theory and Method: WEMoE}
-\label{ch:theory}
-
 Throughout this chapter, $T=5$ is the number of tasks and experts, $i$ indexes experts, $t$ is the task of an input, $\ell\in\{1,\dots,12\}$ indexes encoder layers, and $j$ indexes the $N$ tokens of an input. The method is described as implemented in this study.
 
 \section{BERT Encoder and Shared Backbone}
@@ -19,7 +16,7 @@ where $h$ is a token state, GELU is the activation of Hendrycks and Gimpel~\cite
 
 \begin{figure}[htbp]
   \centering
-  \resizebox{.82\linewidth}{!}{\input{figures_v3/bert}}
+  \resizebox{.82\linewidth}{!}{\input{figures/bert}}
   \caption{BERT encoder as used in this study, from the input tokens to the logits (top), with one encoder layer enlarged (bottom). Dropout layers are not drawn.}
   \label{fig:bert}
 \end{figure}
@@ -37,7 +34,7 @@ WEMoE splits the parameters into two groups. In the design of Tang et al.~\cite{
 
 \begin{figure}[htbp]
   \centering
-  \resizebox{.76\linewidth}{!}{\input{figures_v3/architecture}}\\[2pt]
+  \resizebox{.76\linewidth}{!}{\input{figures/architecture}}\\[2pt]
   \figlegend
   \caption{Merged WEMoE model as implemented. In the full scope both fc1 and fc2 are input-conditioned. In the intermediate-only scope fc2 is static and uses Task Arithmetic.}
   \label{fig:arch}
@@ -106,7 +103,7 @@ p(y\mid x,t)=\mathrm{softmax}\Big(g_t\big(\mathrm{pool}(\mathrm{BERT}(x;\bar\the
 \begin{figure}[htbp]
   \centering
   \begin{minipage}[c]{.25\linewidth}\centering\includegraphics[width=\linewidth]{arch_wemoe_module.png}\end{minipage}\hfill
-  \begin{minipage}[c]{.72\linewidth}\centering\resizebox{\linewidth}{!}{\input{figures_v3/router}}\end{minipage}
+  \begin{minipage}[c]{.72\linewidth}\centering\resizebox{\linewidth}{!}{\input{figures/router}}\end{minipage}
   \caption{Left: the WEMoE module of Tang et al.~\cite{tang2024wemoe}. Right: router of layer $\ell$ as implemented, applied per token and averaged over non-padding tokens.}
   \label{fig:router}
 \end{figure}

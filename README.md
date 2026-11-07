@@ -38,7 +38,7 @@ notebooks/       colab_run.ipynb: the whole pipeline on a Colab GPU, results sav
 tests/           CPU unit tests on tiny random BERTs (offline, a few seconds)
 docs/guide/      setup, running on Colab, getting results back
 docs/report/     results of the first full run, with figures
-report/          written report in LaTeX (v1, v3 in English, v3_vi in Vietnamese), built PDFs in report/output/
+report/          written report (LaTeX, English), main.tex with one file per chapter in content/
 slide/           presentation deck (Beamer, HUST theme vendored in slide/hust-beamer/), one file per part in sections/
 ```
 
@@ -73,6 +73,14 @@ Slides: build with LuaLaTeX from `slide/`. A clean build needs three passes, unt
 ```bash
 cd slide && lualatex main && lualatex main && lualatex main   # slide/main.pdf
 ```
+
+Report: build with XeLaTeX and BibTeX from `report/` (packages in `report/requirements.txt`).
+
+```bash
+cd report && xelatex main && bibtex main && xelatex main && xelatex main   # report/main.pdf
+```
+
+In VS Code, LaTeX Workshop picks the recipe from the first line of each `main.tex` (`lualatex x3` for the slides, `xelatex-bibtex` for the report). Define both recipes in your local `.vscode/settings.json`.
 
 ## Outputs
 

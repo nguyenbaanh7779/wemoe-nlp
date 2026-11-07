@@ -1,6 +1,3 @@
-\chapter{The Problem}
-\label{ch:problem}
-
 \section{Why One Separate Model per Task Does Not Scale}
 
 Pre-trained language models have changed how natural language processing systems are built. An encoder such as BERT~\cite{devlin2019bert} can be fine-tuned for a new classification problem with limited data, so a system that supports several language understanding tasks tends to collect one fine-tuned copy of the same architecture per task. Each copy performs well on its own task, yet the collection becomes costly in four ways.

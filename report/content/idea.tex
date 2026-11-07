@@ -1,6 +1,3 @@
-\chapter{The Idea}
-\label{ch:idea}
-
 \section{Mixture of Experts: The Core Concept}
 
 A Mixture of Experts (MoE)~\cite{jacobs1991adaptive,shazeer2017moe,mu2025survey} solves a problem through several specialised networks $E_1,\dots,E_n$ and a small network called the \emph{router} or gate, $G$, which decides how much each expert counts for the current input (Figure~\ref{fig:moe}):
@@ -37,7 +34,7 @@ Figure~\ref{fig:flow} shows the implementation flow in four stages. Stage 1 prep
 
 \begin{figure}[htbp]
   \centering
-  \resizebox{.8\linewidth}{!}{\input{figures_v3/flow}}
+  \resizebox{.8\linewidth}{!}{\input{figures/flow}}
   \caption{Implementation flow: from datasets to evaluation. Dashed arrows show where the development split selects a model. $\theta_i$ and $\tau_i$ are defined in Section~\ref{sec:problem}, $g_i$ is the classification head of expert $i$, and $\lambda$ is the Task Arithmetic scaling factor of Section~\ref{sec:ta}.}
   \label{fig:flow}
 \end{figure}

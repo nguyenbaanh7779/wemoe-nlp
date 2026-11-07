@@ -1,6 +1,3 @@
-\chapter{Results}
-\label{ch:results}
-
 All scores come from the official validation splits. WEMoE rows give the mean and standard deviation over seeds 0, 1 and 2.
 
 \section{Results by Task}
@@ -30,8 +27,8 @@ Table~\ref{tab:per-task} and Figure~\ref{fig:per-task} give the scores per task,
 
 \begin{figure}[htbp]
   \centering
-  \input{figures/per_task}
-  \caption{Task scores of the merged models between the majority class (dashed tick) and the experts (solid tick). WEMoE values use $k=256$ and are means over three seeds.}
+  \includegraphics[width=.85\linewidth]{per_task.png}
+  \caption{Task scores of the merged models between the majority class (dashed tick) and the experts (solid tick). WEMoE values use $k=256$; bars are means over three seeds and error bars their standard deviation. The yellow bars are the input-independent ablation (layer-wise coefficients, $h=0$).}
   \label{fig:per-task}
 \end{figure}
 
@@ -86,7 +83,7 @@ Table~\ref{tab:main} gives the aggregate comparison. Task Arithmetic reaches 57.
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=.4\linewidth]{k_sweep.png}
+  \includegraphics[width=.6\linewidth]{k_sweep.png}
   \caption{Average validation score of full-MLP WEMoE against the few-shot budget. The line shows the mean, and the dots show the seeds.}
   \label{fig:k-sweep}
 \end{figure}

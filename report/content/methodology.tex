@@ -1,6 +1,3 @@
-\chapter{Experimental Methodology}
-\label{ch:method}
-
 \section{The Five Binary GLUE Tasks and Their Datasets}
 
 The experiments use five binary tasks of the General Language Understanding Evaluation benchmark (GLUE)~\cite{wang2019glue}, loaded through the Hugging Face Datasets library~\cite{lhoest2021datasets} and listed in Table~\ref{tab:data}: MRPC~\cite{dolan2005mrpc}, RTE~\cite{dagan2006rte}, CoLA~\cite{warstadt2019cola}, SST-2~\cite{socher2013sst} and QNLI, which is derived from SQuAD~\cite{rajpurkar2016squad}. CoLA and SST-2 take a single sentence, while MRPC, RTE and QNLI take a pair. Inputs are tokenised and truncated to 128 tokens. The tasks differ widely in size, as Table~\ref{tab:split} shows, and in how much a constant prediction scores, as the last column of Table~\ref{tab:data} shows.

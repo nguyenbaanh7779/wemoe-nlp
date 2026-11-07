@@ -252,3 +252,17 @@ slide/main.pdf
 
 # Local editor settings (LaTeX Workshop recipes with machine-specific paths)
 .vscode/settings.json
+
+# LaTeX build artifacts of the report (report/); build with xelatex + bibtex
+report/*.aux
+report/*.log
+report/*.out
+report/*.toc
+report/*.bbl
+report/*.blg
+report/*.lof
+report/*.lot
+report/*.fls
+report/*.fdb_latexmk
+report/*.synctex.gz
+report/main.pdf
