@@ -1,0 +1,45 @@
+% Part 4: per-task results, trade-offs and conclusion.
+\section{Results}
+
+\begin{frame}{Results by task: the gain is not uniform}
+  \centering
+  \footnotesize
+  \renewcommand{\arraystretch}{1.3}\begin{tabular}{|l|c|c|c|c|c|}
+    \hline
+    \textbf{Model} & \textbf{MRPC (Acc/F1)} & \textbf{RTE (Acc)} & \textbf{CoLA (MCC)} & \textbf{SST-2 (Acc)} & \textbf{QNLI (Acc)}\\ \hline
+    Majority class & 68.4 / 81.2 & 52.7 & 0.0 & 50.9 & 50.5\\ \hline
+    Task Arithmetic & 68.6 / 81.3 & 47.3 & 16.9 & 69.8 & 77.9\\ \hline
+    \textbf{WEMoE full, $k$=256} & 76.3$\pm$4.5 / 83.9$\pm$2.8 & \textbf{52.0 $\pm$ 4.4} & 42.6 $\pm$ 0.9 & 88.0 $\pm$ 0.5 & 86.7 $\pm$ 0.7\\ \hline
+    WEMoE intermediate, $k$=256 & \textbf{66.5$\pm$0.7 / 76.6$\pm$1.0} & 59.0 $\pm$ 0.9 & 41.7 $\pm$ 0.9 & 86.7 $\pm$ 0.2 & 86.5 $\pm$ 0.2\\ \hline
+    Single-task experts & 82.1 / 88.1 & 63.2 & 59.1 & 92.2 & 91.2\\ \hline
+  \end{tabular}
+  \tblcap{Per-task scores on official validation ($\times 100$), mean $\pm$ std over seeds 0, 1, 2.}
+  \vfill
+  \raggedright
+  \begin{itemize}\footnotesize
+    \item \textbf{Not solved everywhere:} full MLP does not reliably beat majority on RTE; intermediate-only falls below it on MRPC.
+    \item \textbf{Budget matters:} small $k$ varies strongly across seeds (CoLA MCC std 14.1 at $k=16$, 17.8 at $k=64$); $k=256$ is stable on the average score.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Trade-offs and conclusion}
+  \centering
+  \footnotesize
+  \renewcommand{\arraystretch}{1.3}\begin{tabular}{|l|c|c|c|c|}
+    \hline
+    \textbf{Deployment} & \textbf{Stored params} & \textbf{vs.\ 5 models} & \textbf{Avg score} & \textbf{ms/example (batch 32)}\\ \hline
+    5 single-task models & 547.4M & 100.0\% & 78.2 & 1.61$^{*}$\\ \hline
+    Task Arithmetic & 109.5M & 20.0\% & 57.4 & 1.63\\ \hline
+    WEMoE, full MLP & 400.0M & 73.1\% & 69.9 & 7.31\\ \hline
+    WEMoE, intermediate-only & 258.4M & 47.2\% & 69.1 & 4.69\\ \hline
+  \end{tabular}
+  \tblcap{Latency on one T4, random 128-token inputs, fp16. $^{*}$Times one expert: each input goes to its own expert by task id.}
+  \vfill
+  \raggedright
+  \begin{itemize}\footnotesize
+    \item \textbf{Answer:} input-conditioned merging with few-shot routers turns separate models into one, and clearly beats the static merge on average.
+    \item \textbf{Cost:} it stays below the experts and is slower per example; the storage saving is largest for intermediate-only.
+    \item \textbf{Limits:} RTE and MRPC remain weak; model selection uses more labels than FSFT trains on; experts use one seed; RTE and MRPC have small validation sets.
+    \item This is one full run on five tasks, not a general guarantee.
+  \end{itemize}
+\end{frame}

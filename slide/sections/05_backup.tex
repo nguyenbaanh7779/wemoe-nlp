@@ -1,0 +1,23 @@
+% Backup slides, shown only when asked.
+\section{Backup}
+
+\begin{frame}{Backup: router details}
+  \begin{itemize}
+    \item Two linear layers with ReLU, applied per token; outputs are averaged over non-padding tokens.
+    \item Initial weights are drawn with std 0.01 and the final bias is set to $\lambda$.
+    \item Input-independent variant: one learned coefficient per expert per layer, 60 numbers in total.
+    \item Experts do not run at inference: only the task vectors and heads are stored.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{References}
+  \footnotesize
+  \begin{enumerate}
+    \item[{[1]}] Shazeer et al. Outrageously Large Neural Networks: The Sparsely-Gated Mixture-of-Experts Layer. arXiv:1701.06538, 2017.
+    \item[{[2]}] Tang et al. Merging Multi-Task Models via Weight-Ensembling Mixture of Experts. arXiv:2402.00433, 2024.
+    \item[{[3]}] Devlin et al. BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding. arXiv:1810.04805, 2019.
+    \item[{[4]}] Ilharco et al. Editing Models with Task Arithmetic. arXiv:2212.04089, 2023.
+    \item[{[5]}] Wang et al. GLUE: A Multi-Task Benchmark and Analysis Platform for Natural Language Understanding. arXiv:1804.07461, 2018.
+    \item[{[6]}] Mu and Lin. A Comprehensive Survey of Mixture-of-Experts: Algorithms, Theory, and Applications. arXiv:2503.07137, 2025.
+  \end{enumerate}
+\end{frame}

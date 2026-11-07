@@ -236,3 +236,16 @@ results/**/*.jsonl
 # Drive downloads of the Colab outputs (several GB)
 *.zip
 .DS_Store
+
+# LaTeX build artifacts of the slide deck (slide/); build with lualatex
+slide/*.aux
+slide/*.log
+slide/*.nav
+slide/*.out
+slide/*.snm
+slide/*.toc
+slide/*.vrb
+slide/*.fls
+slide/*.fdb_latexmk
+slide/*.synctex.gz
+slide/main.pdf

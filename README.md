@@ -38,6 +38,8 @@ notebooks/       colab_run.ipynb: the whole pipeline on a Colab GPU, results sav
 tests/           CPU unit tests on tiny random BERTs (offline, a few seconds)
 docs/guide/      setup, running on Colab, getting results back
 docs/report/     results of the first full run, with figures
+report/          written report in LaTeX (v1, v3 in English, v3_vi in Vietnamese), built PDFs in report/output/
+slide/           presentation deck (Beamer, HUST theme vendored in slide/hust-beamer/), one file per part in sections/
 ```
 
 ## Running
@@ -64,6 +66,12 @@ Interactive demo, which runs on CPU or Apple MPS once the checkpoints are local 
 ```bash
 pip install -r requirements-demo.txt
 python app/demo.py                                   # http://127.0.0.1:7860
+```
+
+Slides: build with LuaLaTeX from `slide/`. A clean build needs three passes, until the log no longer asks for a rerun; the theme places its header bars with TikZ `remember picture`. The TeX packages are listed in `slide/requirements.txt`.
+
+```bash
+cd slide && lualatex main && lualatex main && lualatex main   # slide/main.pdf
 ```
 
 ## Outputs
