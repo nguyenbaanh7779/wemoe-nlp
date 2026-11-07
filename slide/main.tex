@@ -1,5 +1,6 @@
-% !LW recipe=lualatex x2
-% A clean build needs a third pass, until the log no longer asks for a rerun.
+% !LW recipe=lualatex x3
+% Three passes: on a clean build the theme's header bars (TikZ remember picture)
+% only land on the third. The recipe is defined in .vscode/settings.json.
 \documentclass[aspectratio=169,10pt,xcolor=table]{beamer}
 
 % ============================================================

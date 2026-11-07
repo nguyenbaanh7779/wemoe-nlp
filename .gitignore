@@ -249,3 +249,6 @@ slide/*.fls
 slide/*.fdb_latexmk
 slide/*.synctex.gz
 slide/main.pdf
+
+# Local editor settings (LaTeX Workshop recipes with machine-specific paths)
+.vscode/settings.json
