@@ -1,0 +1,105 @@
+% !LW recipe=lualatex x3
+% Three passes: on a clean build the theme's header bars (TikZ remember picture)
+% only land on the third. The recipe is defined in .vscode/settings.json.
+\documentclass[aspectratio=169,10pt,xcolor=table]{beamer}
+
+% ============================================================
+% Official HUST Beamer theme (red, 16:9), vendored in hust-beamer/
+% -- see hust-beamer/README.md for its source. Compile with
+% LuaLaTeX (twice) so the Lato and TeX Gyre Adventor fonts are found.
+% Same layout as the customer-churn-prediction deck.
+% ============================================================
+\makeatletter
+\def\input@path{{hust-beamer/}}
+\makeatother
+\usetheme[
+  color=red,
+  font=lato,
+  titlefont=avantgarde,
+  footerlogo=full,
+  bar=thin,
+  titlepage=cover,
+  sectionpage=panel,
+  numbering=fraction,
+  progressbar=on,
+  footermeta=on,
+  dateaddress=off,
+  footerdate={},
+  toctitle={Outline},
+  reftitle={References}
+]{HUST}
+\graphicspath{{hust-beamer/assets/}{figures/}}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,tabularx}
+% The theme draws with these TikZ libraries; its optional hust-setup.tex
+% (not used here) would otherwise load them. The rest are for the diagrams.
+\usetikzlibrary{calc, decorations.markings, arrows.meta, positioning, fit, backgrounds}
+% Wider cover text block, so the two-line title fits
+\makeatletter
+\hust@param{coverTextW}{0.8500}{0.8500}
+\makeatother
+
+% ---- Diagram styles (frozen / input-conditioned / trainable) ----
+\tikzset{
+  box/.style={rounded corners=1.5pt,align=center,inner sep=2pt,minimum height=.62cm,font=\scriptsize},
+  frz/.style={box,draw=hustnavy,fill=hustnavy!8},
+  mix/.style={box,draw=hustamber,fill=hustyellow!30,thick},
+  trn/.style={box,draw=hustmain,fill=hustmain!18,thick},
+  plain/.style={box,draw=none,fill=none},
+  flow/.style={-{Latex[length=1.5mm]},thick,hustblack},
+  gate/.style={-{Latex[length=1.5mm]},thick,hustmain},
+  dict/.style={-{Latex[length=1.5mm]},thick,hustnavy},
+  group/.style={rounded corners=3pt,draw=hustgray,dashed,inner sep=4pt},
+  note/.style={font=\tiny,text=hustblack!80,align=center}
+}
+
+% ---- Shared macros ----
+% Reference marker, e.g. text\refm{2} -> [2] (list on the References slide)
+\newcommand{\refm}[1]{\textsuperscript{\tiny[#1]}}
+% Caption under a table
+\newcommand{\tblcap}[1]{\par\vspace{1mm}{\centering\scriptsize{\color{hustmain}Table:} #1\par}}
+% Question that leads into the next slide
+\newcommand{\nextq}[1]{\vfill\raggedright{\small\color{hustmain}\textbf{Next:} #1}}
+
+\title[WEMoE for NLP]{Merging 5 GLUE NLP tasks using\texorpdfstring{\\}{ }Weight-Ensembling Mixture of Experts}
+\subtitle{Few-shot router training across five GLUE tasks}
+\author[Group 1]{Group 1}
+\institute{Hanoi University of Science and Technology}
+\date{}
+\hypersetup{pdfauthor={Nguyễn Bá Anh; Nguyễn Thị Nhã Linh; Instructor: Nguyễn Kiêm Hiếu}}
+
+\begin{document}
+
+\hustsetup{slogantext={}}
+\begin{frame}[plain,noframenumbering]
+  \titlepage
+  \begin{tikzpicture}[remember picture, overlay]
+    \node[anchor=north west, align=left, inner sep=0pt, font=\small, text=hustblack]
+      at ([xshift=0.0317\paperwidth, yshift=-0.705\paperheight] current page.north west) {%
+        \textbf{Instructor:} Nguyễn Kiêm Hiếu\\
+        \textbf{Group members:}\\
+        Nguyễn Bá Anh -- 20261218M\\
+        Nguyễn Thị Nhã Linh -- 20261262M};
+  \end{tikzpicture}
+\end{frame}
+
+\begin{frame}[noprogressbar]{\husttoctitle}{\husttocsubtitle}
+  \tableofcontents[hideallsubsections]
+\end{frame}
+
+% One file per part of the talk.
+\input{sections/01_problem}
+\input{sections/02_method}
+\input{sections/03_experiments}
+\input{sections/04_results}
+\input{sections/05_references}
+
+\begin{hustdarkframe}
+  \centering
+  \vspace*{0.22\paperheight}
+  {\Huge\bfseries\color{white} Thank you!\par}
+  \vspace{1.2em}
+  {\Large\color{white!85} Questions?\par}
+\end{hustdarkframe}
+
+\end{document}

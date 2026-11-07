@@ -1,0 +1,10 @@
+fontspec
+tikz
+booktabs
+beamer
+pgf
+pgfopts
+tex-gyre
+lato
+colortbl
+tools

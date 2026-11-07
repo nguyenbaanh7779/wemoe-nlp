@@ -1,0 +1,69 @@
+% Part 1: why merge the five task models, and why a static merge is not enough.
+\section{Problem}
+
+\begin{frame}{One model per task does not scale}
+  \centering
+  \begin{tikzpicture}
+    \node[frz,minimum width=2.1cm] (b) at (0,0) {Pretrained\\ model};
+    \foreach \y/\n/\s in {1.1/A/1, 0/B/2, -1.1/C/T}{
+      \node[frz,minimum width=2.5cm] (m\n) at (4.2,\y) {Model for task $\s$};
+      \draw[flow, rounded corners=2pt] (b.east) -- ++(1.4,0) |- (m\n.west);  % elbow: right, up/down, right
+    }
+    \node[plain] at (4.2,.56) {$\vdots$};
+    \node[note,anchor=west] at (5.6,0) {\footnotesize one checkpoint per task};
+  \end{tikzpicture}
+  \vfill
+  \raggedright
+  \begin{itemize}
+    \item \textbf{Management:} every new task adds another full model to train, store and serve.
+    \item \textbf{Isolation:} each model knows only its own task, so nothing it learned is shared.
+    \item \textbf{Redundancy:} the models start from the same weights, yet that common part is stored again each time.
+  \end{itemize}
+  \nextq{can these separate models become a single model?}
+\end{frame}
+
+\begin{frame}{Problem statement}
+  \centering
+  \begin{tikzpicture}
+    \node[frz,minimum width=4.1cm,minimum height=1.25cm,font=\footnotesize] (i) at (0,0) {\textbf{Input}\\ pretrained weights $\theta_0$\\ task-specific weights $\theta_i,\ i\in\mathcal{T}$};
+    \node[mix,minimum width=2.3cm,minimum height=1.25cm,font=\footnotesize] (c) at (4.3,0) {\textbf{Merge}\\ $\theta_{\mathrm{mer}}=C(\theta_0,\theta_i)$};
+    \node[trn,minimum width=4.1cm,minimum height=1.25cm,font=\footnotesize] (o) at (8.6,0) {\textbf{Output}\\ one multi-task model:\\ (text, task) $\to$ label};
+    \draw[flow] (i) -- (c);
+    \draw[flow] (c) -- (o);
+  \end{tikzpicture}
+  \vfill
+  \raggedright
+  \textbf{Find the merge function $C$ so that the merged model:}
+  \begin{itemize}
+    \item integrates task knowledge \textbf{dynamically}, depending on the input;
+    \item stays close to the quality of the task-specific models;
+    \item needs fewer stored parameters than keeping all the models.
+  \end{itemize}
+  \nextq{why is a simple merge not enough?}
+\end{frame}
+
+\begin{frame}{Why this problem: static merging falls short}
+  \begin{columns}[T]
+    \begin{column}{.48\linewidth}
+      \textbf{Why it is worth solving}
+      \begin{itemize}
+        \item Real systems serve many related NLP tasks.
+        \item A shared model makes knowledge reusable across tasks.
+        \item Merging needs no joint retraining from scratch.
+      \end{itemize}
+    \end{column}
+    \begin{column}{.48\linewidth}
+      \textbf{Why it is hard}
+      \begin{itemize}
+        \item \textbf{Interference:} updates from different tasks can conflict in the same parameters.
+        \item \textbf{Sign disagreement:} models can pull one weight in opposite directions.
+        \item \textbf{Static weights:} one fixed result cannot be the best for every task at once.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \vfill
+  \begin{block}{Gap}
+    The merged weights should change with the input, not stay fixed for all inputs.
+  \end{block}
+  \nextq{how can weights depend on the input?}
+\end{frame}
