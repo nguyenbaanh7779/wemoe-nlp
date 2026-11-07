@@ -1,14 +1,4 @@
-% Backup slides, shown only when asked.
-\section{Backup}
-
-\begin{frame}{Backup: router details}
-  \begin{itemize}
-    \item Two linear layers with ReLU, applied per token; outputs are averaged over non-padding tokens.
-    \item Initial weights are drawn with std 0.01 and the final bias is set to $\lambda$.
-    \item Input-independent variant: one learned coefficient per expert per layer, 60 numbers in total.
-    \item Experts do not run at inference: only the task vectors and heads are stored.
-  \end{itemize}
-\end{frame}
+% References for the \refm{} markers; no \section, so it stays out of the outline.
 
 \begin{frame}{References}
   \footnotesize
