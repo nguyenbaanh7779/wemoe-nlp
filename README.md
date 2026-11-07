@@ -31,8 +31,9 @@ The paper has no GLUE results, so it is only compared qualitatively.
 
 ```
 configs/         default.yaml (all experiments, one shared data split), smoke.yaml (tiny end-to-end check)
-src/wemoe_nlp/   data, metrics, merging, wemoe, experts, baselines, fsft, efficiency, inference
+src/wemoe_nlp/   data, metrics, merging, wemoe, experts, baselines, fsft, efficiency, inference, demo
 scripts/         train_expert, eval_baselines, train_wemoe, count_params, summarize_results, plot_results
+app/             demo.py: Gradio demo comparing expert, Task Arithmetic and WEMoE, with routing weights
 notebooks/       colab_run.ipynb: the whole pipeline on a Colab GPU, results saved to Google Drive
 tests/           CPU unit tests on tiny random BERTs (offline, a few seconds)
 docs/guide/      setup, running on Colab, getting results back
@@ -57,6 +58,13 @@ python scripts/summarize_results.py                  # tables in results/summary
 
 Use `--set section.key=value` to override any config value, for example
 `--set wemoe.k=64 --set wemoe.moe_scope=intermediate`. Use `--config configs/smoke.yaml` for a quick pipeline check.
+
+Interactive demo, which runs on CPU or Apple MPS once the checkpoints are local ([guide](docs/guide/README.md#running-the-demo)):
+
+```bash
+pip install -r requirements-demo.txt
+python app/demo.py                                   # http://127.0.0.1:7860
+```
 
 ## Outputs
 

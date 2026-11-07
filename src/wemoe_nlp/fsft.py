@@ -238,11 +238,17 @@ def train_wemoe(
     return results
 
 
-def load_trained_wemoe(checkpoint_dir, run_name: str, device: torch.device = torch.device("cpu")):
-    """Rebuild a trained WEMoE model from its experts and the saved router weights."""
+def load_router(checkpoint_dir, run_name: str):
+    """``(model_name, WEMoEConfig, router state dict)`` saved by ``train_wemoe`` for ``run_name``."""
     ckpt_dir = Path(checkpoint_dir) / "wemoe" / run_name
     meta = load_json(ckpt_dir / "wemoe_config.json")
-    config = WEMoEConfig(**meta["wemoe"])
-    model = build_wemoe(load_pretrained(meta["model_name"]), load_experts(checkpoint_dir, config.tasks), config)
-    model.load_router_state_dict(torch.load(ckpt_dir / "router.pt", map_location="cpu"))
+    state = torch.load(ckpt_dir / "router.pt", map_location="cpu")
+    return meta["model_name"], WEMoEConfig(**meta["wemoe"]), state
+
+
+def load_trained_wemoe(checkpoint_dir, run_name: str, device: torch.device = torch.device("cpu")):
+    """Rebuild a trained WEMoE model from its experts and the saved router weights."""
+    model_name, config, state = load_router(checkpoint_dir, run_name)
+    model = build_wemoe(load_pretrained(model_name), load_experts(checkpoint_dir, config.tasks), config)
+    model.load_router_state_dict(state)
     return model.to(device).eval()

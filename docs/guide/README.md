@@ -136,6 +136,50 @@ The routing heatmap needs `results/wemoe/full-mean-k256-s0/predictions_validatio
 
 `.gitignore` already excludes the checkpoints (`checkpoints/`, `*.safetensors`, `*.pt`) and the large prediction files (`results/**/*.jsonl`). `git add results/ notebooks/` therefore adds only the small files: `summary.md`, the `.json` results and the notebook.
 
+## Running the Demo
+
+[`app/demo.py`](../../app/demo.py) is a Gradio app.
+
+**Input.** Type a sentence or a pair of sentences, or pick one of three preset GLUE validation examples per task.
+
+**Task.** The demo starts on SST-2.
+- Selecting a task scores the input for that task only. This is the mode to present with: one row, with ✓ or ✗ against the gold label of a preset example.
+- **Auto**, the last option, scores the input for every task that fits it: one sentence for CoLA and SST-2, a pair for MRPC, RTE and QNLI. Only the row of the example's own task has a gold label. The other rows score the sentence for a task it does not belong to, so they cannot be right or wrong.
+
+The routers see only the text, so one input gets one set of routing weights, whichever task it is scored for. Auto shows this directly: several rows share one routing chart.
+
+**Output.**
+- A table with the predictions of the single-task expert, Task Arithmetic and WEMoE for each task. For a preset example, each prediction is marked ✓ or ✗ against the gold label.
+- The routing weights WEMoE used for the input, in two tabs. Blue adds an expert's task vector and red subtracts it.
+  - **Mean over layers** (the default) is a bar chart with one bar per expert: its weight averaged over the 12 layers. A dashed line marks Task Arithmetic's 0.3.
+  - **Per layer (heatmap)** shows all 12 layers × 5 experts.
+
+**WEMoE model.** The demo uses the full-MLP model of the report, `full-mean-k256-s0`. Another run can be passed with `--run`.
+
+**Requirements.** The five experts in `checkpoints/experts/` and the run's folder in `checkpoints/wemoe/`, which holds only `router.pt` and `wemoe_config.json`. `results/baselines.json` in the repository provides λ, so `results/` does not need to be downloaded.
+
+### On your machine
+
+```bash
+pip install -r requirements.txt -r requirements-demo.txt
+python app/demo.py                 # then open http://127.0.0.1:7860
+```
+
+- **Device.** The demo picks the first device available: CUDA, then Apple MPS, then CPU. To choose one, pass `--device cpu`.
+- **First start.** Downloads `bert-base-uncased` (440 MB) from the Hugging Face hub.
+- **Loading time.** About 30 s on CPU and a few seconds on MPS.
+- **Memory.** About 5 GB of RAM: the pre-trained BERT, the five experts, Task Arithmetic and one WEMoE run.
+- **Speed.** On MPS, one task takes about 0.2 s and Auto mode about 0.7 s (two or three tasks × three models).
+- **Sharing.** `--share` also prints a public `gradio.live` link. `--port` changes the port.
+
+The demo reproduces the saved results. On the 15 preset examples, its WEMoE predictions match `results/wemoe/full-mean-k256-s0/predictions_validation.jsonl`: the labels are identical, the probabilities differ by at most 0.0004 and the routing weights by at most 0.001.
+
+### On Colab
+
+Run the setup cells, then the last cell of the notebook, **Optional: interactive demo**. It installs Gradio, loads the models from Drive and prints a public link. The cell keeps running until you stop it.
+
+The clone cell must check out a branch that contains `app/`.
+
 ## Troubleshooting
 
 - **`Could not open requirements file: requirements.txt` and `git log` shows `Initial commit`.** `/content/wemoe-nlp` already exists from an earlier clone of a different branch. The clone cell only clones when that folder is missing, so changing `BRANCH` has no effect. Delete the old clone and rerun the clone cell:
