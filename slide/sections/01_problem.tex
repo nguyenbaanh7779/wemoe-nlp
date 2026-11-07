@@ -7,7 +7,7 @@
     \node[frz,minimum width=2.1cm] (b) at (0,0) {Pretrained\\ model};
     \foreach \y/\n/\s in {1.1/A/1, 0/B/2, -1.1/C/T}{
       \node[frz,minimum width=2.5cm] (m\n) at (4.2,\y) {Model for task $\s$};
-      \draw[flow] (b.east) -- (m\n.west);
+      \draw[flow, rounded corners=2pt] (b.east) -- ++(1.4,0) |- (m\n.west);  % elbow: right, up/down, right
     }
     \node[plain] at (4.2,.56) {$\vdots$};
     \node[note,anchor=west] at (5.6,0) {\footnotesize one checkpoint per task};
